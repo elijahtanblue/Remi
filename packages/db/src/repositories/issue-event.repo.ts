@@ -21,11 +21,11 @@ export async function createIssueEvent(
       eventType: data.eventType,
       source: data.source,
       actorExternalId: data.actorExternalId,
-      rawPayload: data.rawPayload as Prisma.JsonValue,
+      rawPayload: data.rawPayload as NonNullable<Prisma.JsonValue>,
       s3PayloadKey: data.s3PayloadKey,
       occurredAt: data.occurredAt,
       ...(data.changedFields !== undefined
-        ? { changedFields: data.changedFields as Prisma.JsonValue }
+        ? { changedFields: data.changedFields as NonNullable<Prisma.JsonValue> }
         : {}),
     },
   });

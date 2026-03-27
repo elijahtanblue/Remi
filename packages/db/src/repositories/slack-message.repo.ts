@@ -21,7 +21,7 @@ export async function createSlackMessage(
       slackMessageTs: data.slackMessageTs,
       slackUserId: data.slackUserId,
       text: data.text,
-      rawPayload: data.rawPayload as Prisma.JsonValue,
+      rawPayload: data.rawPayload as NonNullable<Prisma.JsonValue>,
       s3PayloadKey: data.s3PayloadKey,
       source: data.source,
       sentAt: data.sentAt,
