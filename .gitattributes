@@ -1,0 +1,10 @@
+# Force LF line endings for all text files in this repo.
+# This prevents Windows Git from converting LF → CRLF,
+# which causes noise in diffs and can break shell scripts inside Docker.
+* text=auto eol=lf
+
+# Explicitly keep binary files untouched
+*.png binary
+*.jpg binary
+*.ico binary
+*.pem binary
