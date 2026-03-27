@@ -1,0 +1,318 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Workspace ───────────────────────────────────────────────────────────────
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slackInstalls SlackWorkspaceInstall[]
+  jiraInstalls  JiraWorkspaceInstall[]
+  users         User[]
+  issues        Issue[]
+  slackThreads  SlackThread[]
+  summaryRuns   SummaryRun[]
+  auditLogs     AuditLog[]
+  deadLetters   QueueDeadLetter[]
+
+  @@map("workspaces")
+}
+
+// ─── Integration Installs ────────────────────────────────────────────────────
+
+model SlackWorkspaceInstall {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  slackTeamId     String    @unique
+  slackTeamName   String
+  botToken        String
+  botUserId       String
+  installedByUserId String?
+  scopes          String[]
+  installedAt     DateTime  @default(now())
+  uninstalledAt   DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([slackTeamId])
+  @@map("slack_workspace_installs")
+}
+
+model JiraWorkspaceInstall {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  jiraClientKey String    @unique
+  jiraSiteUrl   String
+  sharedSecret  String
+  installedAt   DateTime  @default(now())
+  uninstalledAt DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([jiraClientKey])
+  @@map("jira_workspace_installs")
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(cuid())
+  workspaceId String
+  displayName String?
+  email       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace  Workspace       @relation(fields: [workspaceId], references: [id])
+  slackUsers SlackUser[]
+  jiraUsers  JiraUser[]
+  crosswalks UserCrosswalk[]
+  linkedIssueThreads IssueThreadLink[]
+
+  @@index([workspaceId])
+  @@map("users")
+}
+
+model SlackUser {
+  id            String  @id @default(cuid())
+  userId        String
+  slackUserId   String
+  slackTeamId   String
+  slackUsername  String?
+  slackRealName String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([slackUserId, slackTeamId])
+  @@index([slackUserId])
+  @@map("slack_users")
+}
+
+model JiraUser {
+  id              String  @id @default(cuid())
+  userId          String
+  jiraAccountId   String
+  jiraSiteUrl     String
+  jiraDisplayName String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([jiraAccountId, jiraSiteUrl])
+  @@index([jiraAccountId])
+  @@map("jira_users")
+}
+
+model UserCrosswalk {
+  id         String @id @default(cuid())
+  userId     String
+  source     String
+  externalId String
+  metadata   Json?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([source, externalId])
+  @@map("user_crosswalks")
+}
+
+// ─── Issues ──────────────────────────────────────────────────────────────────
+
+model Issue {
+  id                     String   @id @default(cuid())
+  workspaceId            String
+  jiraIssueId            String
+  jiraIssueKey           String
+  jiraSiteUrl            String
+  title                  String
+  status                 String?
+  statusCategory         String?
+  assigneeJiraAccountId  String?
+  priority               String?
+  issueType              String?
+  rawPayload             Json?
+  s3PayloadKey           String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id])
+  events      IssueEvent[]
+  threadLinks IssueThreadLink[]
+  summaries   Summary[]
+
+  @@unique([jiraIssueId, jiraSiteUrl])
+  @@index([workspaceId])
+  @@index([jiraIssueKey])
+  @@map("issues")
+}
+
+model IssueEvent {
+  id              String    @id @default(cuid())
+  issueId         String
+  idempotencyKey  String    @unique
+  eventType       String
+  source          String
+  actorExternalId String?
+  changedFields   Json?
+  rawPayload      Json
+  s3PayloadKey    String?
+  occurredAt      DateTime
+  receivedAt      DateTime  @default(now())
+  processedAt     DateTime?
+
+  issue Issue @relation(fields: [issueId], references: [id])
+
+  @@index([issueId, occurredAt])
+  @@index([idempotencyKey])
+  @@map("issue_events")
+}
+
+// ─── Slack Threads & Messages ────────────────────────────────────────────────
+
+model SlackThread {
+  id          String   @id @default(cuid())
+  workspaceId String
+  slackTeamId String
+  channelId   String
+  threadTs    String
+  channelName String?
+  permalink   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace  Workspace         @relation(fields: [workspaceId], references: [id])
+  messages   SlackMessage[]
+  issueLinks IssueThreadLink[]
+
+  @@unique([slackTeamId, channelId, threadTs])
+  @@index([workspaceId])
+  @@map("slack_threads")
+}
+
+model SlackMessage {
+  id             String    @id @default(cuid())
+  threadId       String
+  idempotencyKey String    @unique
+  slackMessageTs String
+  slackUserId    String
+  text           String
+  rawPayload     Json
+  s3PayloadKey   String?
+  source         String
+  sentAt         DateTime
+  receivedAt     DateTime  @default(now())
+  processedAt    DateTime?
+
+  thread SlackThread @relation(fields: [threadId], references: [id])
+
+  @@index([threadId, sentAt])
+  @@index([idempotencyKey])
+  @@map("slack_messages")
+}
+
+// ─── Links ───────────────────────────────────────────────────────────────────
+
+model IssueThreadLink {
+  id             String    @id @default(cuid())
+  issueId        String
+  threadId       String
+  linkedByUserId String?
+  linkedAt       DateTime  @default(now())
+  unlinkedAt     DateTime?
+
+  issue    Issue       @relation(fields: [issueId], references: [id])
+  thread   SlackThread @relation(fields: [threadId], references: [id])
+  linkedBy User?       @relation(fields: [linkedByUserId], references: [id])
+
+  @@unique([issueId, threadId])
+  @@index([issueId])
+  @@index([threadId])
+  @@map("issue_thread_links")
+}
+
+// ─── Summaries ───────────────────────────────────────────────────────────────
+
+model Summary {
+  id            String   @id @default(cuid())
+  issueId       String
+  version       Int      @default(1)
+  status        String   @default("current")
+  content       Json
+  triggerReason String
+  inputHash     String
+  generatedAt   DateTime @default(now())
+  summaryRunId  String?
+
+  issue      Issue       @relation(fields: [issueId], references: [id])
+  summaryRun SummaryRun? @relation(fields: [summaryRunId], references: [id])
+
+  @@index([issueId, version])
+  @@index([issueId, status])
+  @@map("summaries")
+}
+
+model SummaryRun {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  status         String    @default("pending")
+  issueCount     Int       @default(0)
+  completedCount Int       @default(0)
+  failedCount    Int       @default(0)
+  triggeredBy    String
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  error          String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  summaries Summary[]
+
+  @@index([workspaceId])
+  @@map("summary_runs")
+}
+
+// ─── Operational ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  action      String
+  actorType   String
+  actorId     String?
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model QueueDeadLetter {
+  id          String    @id @default(cuid())
+  workspaceId String?
+  queue       String
+  messageId   String?
+  payload     Json
+  error       String
+  failedAt    DateTime  @default(now())
+  retriedAt   DateTime?
+  retryCount  Int       @default(0)
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+
+  @@index([queue, failedAt])
+  @@map("queue_dead_letters")
+}

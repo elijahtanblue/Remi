@@ -1,0 +1,9 @@
+node_modules
+.git
+.env*
+dist
+.next
+.turbo
+*.log
+coverage
+.nyc_output

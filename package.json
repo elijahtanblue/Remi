@@ -1,0 +1,32 @@
+{
+  "name": "remi",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "turbo run clean",
+    "db:push": "pnpm --filter @remi/db db:push",
+    "db:generate": "pnpm --filter @remi/db db:generate",
+    "db:seed": "pnpm --filter @remi/db db:seed",
+    "db:migrate": "pnpm --filter @remi/db db:migrate"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^4.1.1",
+    "eslint": "^9.0.0",
+    "prettier": "^3.4.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.1"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

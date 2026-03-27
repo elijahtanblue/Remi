@@ -1,0 +1,16 @@
+# Windows reserved device name — cannot be committed on Windows
+CON
+
+node_modules/
+dist/
+.turbo/
+.next/
+.env
+.env.local
+.env.prod
+*.pem
+*.log
+.local-storage/
+coverage/
+.prisma/
+AI_decisions.md
