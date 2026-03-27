@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
+import { createSummary } from '@remi/db';
 import type { SummaryOutput } from '@remi/shared';
 import { collectIssueData } from './collectors/issue-collector.js';
 import { collectThreadData } from './collectors/thread-collector.js';
@@ -104,22 +105,12 @@ export async function generateSummary(
   // 8. Persist atomically
   const version = (existingSummary?.version ?? 0) + 1;
 
-  await prisma.$transaction(async (tx) => {
-    await tx.summary.updateMany({
-      where: { issueId, status: 'current' },
-      data: { status: 'superseded' },
-    });
-
-    await tx.summary.create({
-      data: {
-        issueId,
-        version,
-        content: summary as unknown as import('@prisma/client').Prisma.InputJsonValue,
-        triggerReason,
-        inputHash,
-        status: 'current',
-      },
-    });
+  await createSummary(prisma, {
+    issueId,
+    version,
+    content: summary as unknown as Record<string, unknown>,
+    triggerReason,
+    inputHash,
   });
 
   return { summary, inputHash, version, skipped: false };

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { IssueThreadLink, PrismaClient, SlackMessage } from '@prisma/client';
 import type { ThreadData } from '../types.js';
 
 export async function collectThreadData(
@@ -10,7 +10,7 @@ export async function collectThreadData(
   });
 
   const threads: ThreadData[] = await Promise.all(
-    links.map(async (link) => {
+    links.map(async (link: IssueThreadLink) => {
       const thread = await prisma.slackThread.findUniqueOrThrow({
         where: { id: link.threadId },
       });
@@ -23,7 +23,7 @@ export async function collectThreadData(
       return {
         id: thread.id,
         channelId: thread.channelId,
-        messages: rawMessages.map((m) => ({
+        messages: rawMessages.map((m: SlackMessage) => ({
           id: m.id,
           slackUserId: m.slackUserId,
           text: m.text,
