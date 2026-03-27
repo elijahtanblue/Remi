@@ -14,7 +14,7 @@ export async function createDeadLetter(
     data: {
       queue: data.queue,
       messageId: data.messageId,
-      payload: data.payload as Prisma.InputJsonValue,
+      payload: data.payload as Prisma.JsonValue,
       error: data.error,
       ...(data.workspaceId !== undefined ? { workspaceId: data.workspaceId } : {}),
     },

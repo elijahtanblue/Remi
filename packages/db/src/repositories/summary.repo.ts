@@ -11,7 +11,7 @@ export async function createSummary(
     summaryRunId?: string;
   },
 ) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.summary.updateMany({
       where: { issueId: data.issueId, status: 'current' },
       data: { status: 'superseded' },
@@ -21,7 +21,7 @@ export async function createSummary(
       data: {
         issueId: data.issueId,
         version: data.version,
-        content: data.content as Prisma.InputJsonValue,
+        content: data.content as Prisma.JsonValue,
         triggerReason: data.triggerReason,
         inputHash: data.inputHash,
         summaryRunId: data.summaryRunId,

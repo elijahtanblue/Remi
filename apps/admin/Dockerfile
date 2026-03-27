@@ -17,7 +17,7 @@ RUN pnpm install --frozen-lockfile
 COPY --from=builder /app/out/full/ .
 COPY --from=builder /app/tsconfig.base.json ./tsconfig.base.json
 RUN pnpm --filter @remi/db db:generate
-RUN pnpm --filter @remi/admin build
+RUN pnpm --filter @remi/admin... build
 
 FROM base AS runner
 WORKDIR /app

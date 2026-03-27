@@ -21,7 +21,7 @@ export async function createAuditLog(
       targetType: data.targetType,
       targetId: data.targetId,
       ...(data.metadata !== undefined
-        ? { metadata: data.metadata as Prisma.InputJsonValue }
+        ? { metadata: data.metadata as Prisma.JsonValue }
         : {}),
     },
   });

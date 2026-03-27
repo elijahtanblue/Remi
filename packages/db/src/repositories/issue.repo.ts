@@ -57,7 +57,7 @@ export async function upsertIssue(
   } = data;
 
   const jsonPayload =
-    rawPayload !== undefined ? (rawPayload as Prisma.InputJsonValue) : undefined;
+    rawPayload !== undefined ? (rawPayload as Prisma.JsonValue) : undefined;
 
   return prisma.issue.upsert({
     where: { jiraIssueId_jiraSiteUrl: { jiraIssueId, jiraSiteUrl } },
