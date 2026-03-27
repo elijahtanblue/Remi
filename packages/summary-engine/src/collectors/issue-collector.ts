@@ -1,4 +1,4 @@
-import type { IssueEvent, PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import type { IssueSnapshot, IssueEventRecord } from '../types.js';
 
 export async function collectIssueData(
@@ -23,7 +23,7 @@ export async function collectIssueData(
     orderBy: { occurredAt: 'asc' },
   });
 
-  const events: IssueEventRecord[] = rawEvents.map((e: IssueEvent) => ({
+  const events: IssueEventRecord[] = rawEvents.map((e: (typeof rawEvents)[number]) => ({
     id: e.id,
     eventType: e.eventType,
     changedFields: (e.changedFields as Record<string, unknown> | null) ?? null,
