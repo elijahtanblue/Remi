@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 export async function findIssueById(prisma: PrismaClient, id: string) {
   return prisma.issue.findUnique({ where: { id } });
@@ -57,7 +57,7 @@ export async function upsertIssue(
   } = data;
 
   const jsonPayload =
-    rawPayload !== undefined ? (rawPayload as NonNullable<Prisma.JsonValue>) : undefined;
+    rawPayload !== undefined ? (rawPayload as any) : undefined;
 
   return prisma.issue.upsert({
     where: { jiraIssueId_jiraSiteUrl: { jiraIssueId, jiraSiteUrl } },

@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 export async function createAuditLog(
   prisma: PrismaClient,
@@ -21,7 +21,7 @@ export async function createAuditLog(
       targetType: data.targetType,
       targetId: data.targetId,
       ...(data.metadata !== undefined
-        ? { metadata: data.metadata as NonNullable<Prisma.JsonValue> }
+        ? { metadata: data.metadata as any }
         : {}),
     },
   });

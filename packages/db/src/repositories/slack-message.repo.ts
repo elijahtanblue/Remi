@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 export async function createSlackMessage(
   prisma: PrismaClient,
@@ -21,7 +21,7 @@ export async function createSlackMessage(
       slackMessageTs: data.slackMessageTs,
       slackUserId: data.slackUserId,
       text: data.text,
-      rawPayload: data.rawPayload as NonNullable<Prisma.JsonValue>,
+      rawPayload: data.rawPayload as any,
       s3PayloadKey: data.s3PayloadKey,
       source: data.source,
       sentAt: data.sentAt,

@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 export async function createDeadLetter(
   prisma: PrismaClient,
@@ -14,7 +14,7 @@ export async function createDeadLetter(
     data: {
       queue: data.queue,
       messageId: data.messageId,
-      payload: data.payload as NonNullable<Prisma.JsonValue>,
+      payload: data.payload as any,
       error: data.error,
       ...(data.workspaceId !== undefined ? { workspaceId: data.workspaceId } : {}),
     },

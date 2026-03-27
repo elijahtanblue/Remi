@@ -21,7 +21,7 @@ export async function createSummary(
       data: {
         issueId: data.issueId,
         version: data.version,
-        content: data.content as NonNullable<Prisma.JsonValue>,
+        content: data.content as any,
         triggerReason: data.triggerReason,
         inputHash: data.inputHash,
         summaryRunId: data.summaryRunId,
