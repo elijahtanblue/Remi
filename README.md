@@ -545,9 +545,12 @@ Now you'll point your Slack app at your real server instead of your laptop.
 
 ### Step 13: Connect Jira to your live server
 
-> **Your Jira Cloud account → Settings (gear icon) → Apps → Manage apps**
+> Jira has moved app management. Go to:
+> `https://YOUR_JIRA_SITE.atlassian.net/jira/settings/apps/manage-apps`
+>
+> Or: Jira → **gear icon (⚙)** top-right → **Apps** → **Manage your apps**. You must be a Jira admin.
 
-1. Click **Upload app**
+1. On the Manage apps page, click **Upload app** (top right — if you don't see it, enable development mode: scroll to the bottom of the page and click **Settings**, then check **Enable development mode**, then click Apply)
 2. Enter this URL (replace with your EC2 IP):
    ```
    http://YOUR_EC2_IP:3000/jira/atlassian-connect.json
