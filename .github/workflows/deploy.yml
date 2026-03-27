@@ -154,9 +154,9 @@ jobs:
             # Pull images pinned to this exact commit SHA
             compose -f docker-compose.prod.yml pull
 
-            # Run production migrations (migrate deploy, not migrate dev)
+            # Push schema to database (project uses db:push, not migrate)
             compose -f docker-compose.prod.yml run --rm api \
-              pnpm --filter @remi/db db:migrate:prod
+              pnpm --filter @remi/db db:push --accept-data-loss
 
             # Restart all services with new images
             compose -f docker-compose.prod.yml up -d --remove-orphans

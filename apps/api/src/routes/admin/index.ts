@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import {
   prisma,
   listWorkspaces,
+  createWorkspace,
+  upsertSlackInstall,
   listAuditLogs,
   listDeadLetters,
   retryDeadLetter,
@@ -28,6 +30,30 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/workspaces', async () => {
     const workspaces = await listWorkspaces(prisma);
     return { workspaces };
+  });
+
+  // POST /admin/workspaces — create a workspace and its Slack install in one step
+  // Body: { name, slug, slackTeamId, slackTeamName, botToken, botUserId, scopes? }
+  app.post('/workspaces', async (request, reply) => {
+    const body = request.body as {
+      name: string;
+      slug: string;
+      slackTeamId: string;
+      slackTeamName: string;
+      botToken: string;
+      botUserId: string;
+      scopes?: string[];
+    };
+    const workspace = await createWorkspace(prisma, { name: body.name, slug: body.slug });
+    const slackInstall = await upsertSlackInstall(prisma, {
+      workspaceId: workspace.id,
+      slackTeamId: body.slackTeamId,
+      slackTeamName: body.slackTeamName,
+      botToken: body.botToken,
+      botUserId: body.botUserId,
+      scopes: body.scopes ?? ['channels:history', 'channels:read', 'chat:write', 'commands', 'im:write', 'users:read'],
+    });
+    return reply.code(201).send({ workspace, slackInstall });
   });
 
   // GET /admin/workspaces/:workspaceId/summaries

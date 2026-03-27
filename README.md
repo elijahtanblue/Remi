@@ -499,7 +499,7 @@ echo "YOUR_GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password
 docker compose -f docker-compose.prod.yml pull
 
 # Apply database schema
-docker compose -f docker-compose.prod.yml run --rm api pnpm --filter @remi/db db:migrate:prod
+docker compose -f docker-compose.prod.yml run --rm api pnpm --filter @remi/db db:push --accept-data-loss
 
 # Start all 3 services
 docker compose -f docker-compose.prod.yml up -d
