@@ -85,6 +85,7 @@ export async function slackRoutes(app: FastifyInstance) {
     // Slack signs the exact raw payload body, so for HTTP mode we parse Slack requests
     // as raw strings inside this plugin, verify the signature ourselves, then hand the
     // already-parsed payload to Bolt via processEvent().
+    app.removeContentTypeParser(['application/json', 'application/x-www-form-urlencoded']);
     app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
       done(null, body);
     });

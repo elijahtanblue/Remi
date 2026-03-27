@@ -302,8 +302,10 @@ Save the bucket name — you'll need it later.
    - Click **Create key pair** — a file called `remi-key.pem` will download automatically
    - **Keep this file safe** — you'll need it to connect to your server
 6. Network settings → Edit:
-   - Add a rule: Type **Custom TCP**, Port **3000**, Source **0.0.0.0/0** (the API)
-   - Add a rule: Type **Custom TCP**, Port **3001**, Source **0.0.0.0/0** (the admin dashboard)
+   - Add a rule: Type **HTTP**, Port **80**, Source **0.0.0.0/0** (for HTTPS certificate provisioning via Caddy)
+   - Add a rule: Type **HTTPS**, Port **443**, Source **0.0.0.0/0** (for HTTPS traffic)
+   - Add a rule: Type **Custom TCP**, Port **3000**, Source **0.0.0.0/0** (the API — you can restrict this to localhost after Caddy is running)
+   - Add a rule: Type **Custom TCP**, Port **3001**, Source **0.0.0.0/0** (the admin dashboard — you can restrict this to localhost after Caddy is running)
    - SSH (port 22) is already there — change Source to **My IP** for security
 7. Click **Launch instance**
 
@@ -416,11 +418,11 @@ SLACK_SOCKET_MODE=false
 
 # API
 PORT=3000
-BASE_URL=http://YOUR_EC2_IP:3000
+BASE_URL=https://api.memoremi.com
 ADMIN_API_KEY=GENERATE_A_LONG_RANDOM_STRING_HERE
 
 # Admin dashboard
-NEXT_PUBLIC_API_URL=http://YOUR_EC2_IP:3000
+NEXT_PUBLIC_API_URL=https://api.memoremi.com
 ```
 
 **To save and exit nano:** press `Ctrl+X`, then `Y`, then `Enter`.
@@ -436,7 +438,7 @@ NEXT_PUBLIC_API_URL=http://YOUR_EC2_IP:3000
 | `SLACK_BOT_TOKEN` | Slack app → OAuth & Permissions → Bot User OAuth Token |
 | `SLACK_SIGNING_SECRET` | Slack app → Basic Information → Signing Secret |
 | `ADMIN_API_KEY` | Make up a random password (run `openssl rand -hex 32` to generate one) |
-| `BASE_URL` | `http://` + your EC2 public IP + `:3000` |
+| `BASE_URL` | `https://api.memoremi.com` (after DNS is set up in Step 14) |
 
 ---
 
@@ -513,9 +515,13 @@ docker compose -f docker-compose.prod.yml ps
 
 You should see `api`, `admin`, and `worker` all showing as `Up`.
 
-Test it in your browser:
+Test it in your browser (using the IP directly before DNS is set up):
 - API: `http://YOUR_EC2_IP:3000/health`
 - Admin dashboard: `http://YOUR_EC2_IP:3001`
+
+After completing Step 14 (domain + HTTPS), these become:
+- API: `https://api.memoremi.com/health`
+- Admin dashboard: `https://admin.memoremi.com`
 
 ---
 
@@ -526,16 +532,16 @@ Now you'll point your Slack app at your real server instead of your laptop.
 > **Your web browser → [api.slack.com/apps](https://api.slack.com/apps)**
 
 1. Click your app → **Event Subscriptions** → turn on Events
-2. Set **Request URL** to: `http://YOUR_EC2_IP:3000/slack/events`
+2. Set **Request URL** to: `https://api.memoremi.com/slack/events`
 3. Under **Subscribe to bot events**, add: `message.channels`, `app_home_opened`
 4. Save changes
 
 5. Click **Slash Commands** → edit each command:
-   - `/link-ticket` → Request URL: `http://YOUR_EC2_IP:3000/slack/commands`
-   - `/brief` → Request URL: `http://YOUR_EC2_IP:3000/slack/commands`
+   - `/link-ticket` → Request URL: `https://api.memoremi.com/slack/commands`
+   - `/brief` → Request URL: `https://api.memoremi.com/slack/commands`
 
 6. Click **Interactivity & Shortcuts** → turn on Interactivity
-   - Request URL: `http://YOUR_EC2_IP:3000/slack/interactions`
+   - Request URL: `https://api.memoremi.com/slack/interactions`
 
 7. Click **Socket Mode** → **Disable Socket Mode** (you have a real URL now)
 
@@ -556,7 +562,7 @@ Now you'll point your Slack app at your real server instead of your laptop.
 7. Select which Atlassian apps to connect to (choose Jira)
 8. Paste your app descriptor URL:
    ```
-   http://YOUR_EC2_IP:3000/jira/atlassian-connect.json
+   https://api.memoremi.com/jira/atlassian-connect.json
    ```
 9. Click **Install app**
 
@@ -564,9 +570,26 @@ Remi should now appear as an installed app in Jira and show a panel on your issu
 
 ---
 
-### (Optional) Step 14: Set up a domain name and HTTPS
+### Step 14: Set up memoremi.com with HTTPS
 
-Using an IP address works but isn't ideal. If you have a domain name, you can set it up with free HTTPS using Caddy:
+This step connects your domain (`memoremi.com`) to your EC2 server and enables HTTPS via Caddy (free, automatic certificates).
+
+#### A. Point DNS at your EC2 server
+
+Log into your domain registrar (wherever you registered memoremi.com) and create two DNS A records:
+
+| Hostname | Type | Value |
+|---|---|---|
+| `api.memoremi.com` | A | Your EC2 public IP |
+| `admin.memoremi.com` | A | Your EC2 public IP |
+
+DNS changes can take 1–60 minutes to propagate. Check with:
+
+```bash
+nslookup api.memoremi.com
+```
+
+#### B. Install Caddy and configure reverse proxy
 
 > **Server terminal (SSH session)**
 
@@ -574,13 +597,13 @@ Using an IP address works but isn't ideal. If you have a domain name, you can se
 # Install Caddy
 sudo yum install -y caddy
 
-# Create a simple Caddy config (replace yourdomain.com with your actual domain)
+# Create the Caddy config
 sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
-api.yourdomain.com {
+api.memoremi.com {
     reverse_proxy localhost:3000
 }
 
-admin.yourdomain.com {
+admin.memoremi.com {
     reverse_proxy localhost:3001
 }
 EOF
@@ -589,13 +612,40 @@ sudo systemctl enable caddy
 sudo systemctl start caddy
 ```
 
-Then point your domain's DNS A records at your EC2 IP address, and Caddy handles the HTTPS certificate automatically.
+Caddy automatically obtains and renews TLS certificates from Let's Encrypt — no manual certificate management needed.
 
-Update `BASE_URL` in your `.env.prod` to use `https://api.yourdomain.com`, restart the containers:
+#### C. Restart the containers
+
+The `BASE_URL` and `NEXT_PUBLIC_API_URL` in your `.env.prod` are already set to the domain values from Step 9. Restart to pick them up:
 
 ```bash
+cd ~/remi
 docker compose -f docker-compose.prod.yml up -d
 ```
+
+#### D. Verify everything works
+
+- API: `https://api.memoremi.com/health` → should return `{"status":"ok"}`
+- Admin: `https://admin.memoremi.com` → should load the dashboard
+- Slack webhook verification: re-save each URL in the Slack app settings to confirm Slack can reach them
+
+#### E. (Optional) Lock down ports 3000 and 3001
+
+Once Caddy is running, all external traffic enters via port 443. You can optionally restrict ports 3000 and 3001 in your EC2 security group to source `127.0.0.1/32` (localhost only), preventing direct access to the raw app ports from the internet.
+
+#### F. (Optional) Deploy the admin dashboard to Vercel instead of EC2
+
+The admin app (`apps/admin`) includes a `vercel.json` and can be deployed to Vercel for simpler hosting:
+
+1. Go to [vercel.com](https://vercel.com) → **Add New Project** → import your GitHub repo
+2. Set the **Root Directory** to `apps/admin`
+3. Under **Environment Variables**, add:
+   - `NEXT_PUBLIC_API_URL` = `https://api.memoremi.com`
+   - `ADMIN_API_KEY` = your admin key
+4. Deploy — Vercel gives you a default URL like `remi-admin.vercel.app`
+5. Go to **Settings → Domains** in Vercel and add `admin.memoremi.com`
+6. In your DNS registrar, update the `admin.memoremi.com` A record to point to Vercel's IP (Vercel will show you the correct value)
+7. Remove `admin.memoremi.com` from your Caddy config (since Vercel now handles it) and restart Caddy
 
 ---
 
@@ -651,7 +701,7 @@ packages/
 
 ## Admin dashboard
 
-Visit `http://YOUR_EC2_IP:3001` once the app is running.
+Visit `https://admin.memoremi.com` once the app is running (or `http://YOUR_EC2_IP:3001` before DNS is set up).
 
 The admin dashboard shows:
 - All workspaces and their Slack/Jira install status
@@ -724,11 +774,11 @@ SLACK_SOCKET_MODE=false
 
 # ─── API ────────────────────────────────────────────────────────────────────
 PORT=3000
-BASE_URL=https://your-domain.com
+BASE_URL=https://api.memoremi.com
 ADMIN_API_KEY=<64-char random string>
 
 # ─── Admin dashboard ────────────────────────────────────────────────────────
-NEXT_PUBLIC_API_URL=https://your-domain.com
+NEXT_PUBLIC_API_URL=https://api.memoremi.com
 ADMIN_API_KEY=<same as above>
 ```
 
