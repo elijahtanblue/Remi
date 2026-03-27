@@ -545,17 +545,20 @@ Now you'll point your Slack app at your real server instead of your laptop.
 
 ### Step 13: Connect Jira to your live server
 
-> Jira has moved app management. Go to:
-> `https://YOUR_JIRA_SITE.atlassian.net/jira/settings/apps/manage-apps`
->
-> Or: Jira → **gear icon (⚙)** top-right → **Apps** → **Manage your apps**. You must be a Jira admin.
+> You must be an **Organization admin** or **Site admin** on Atlassian to do this.
 
-1. On the Manage apps page, click **Upload app** (top right — if you don't see it, enable development mode: scroll to the bottom of the page and click **Settings**, then check **Enable development mode**, then click Apply)
-2. Enter this URL (replace with your EC2 IP):
+1. Go to **[admin.atlassian.com](https://admin.atlassian.com)** and select your organisation
+2. Click **Apps** in the top navigation
+3. In the left sidebar under **Sites**, select your Jira site
+4. Click **Connected apps** in the left sidebar
+5. Click the **Settings** tab → enable **Development mode**
+6. Click **Install a private app**
+7. Select which Atlassian apps to connect to (choose Jira)
+8. Paste your app descriptor URL:
    ```
    http://YOUR_EC2_IP:3000/jira/atlassian-connect.json
    ```
-3. Click **Upload**
+9. Click **Install app**
 
 Remi should now appear as an installed app in Jira and show a panel on your issues.
 
