@@ -1,5 +1,4 @@
 import Fastify from 'fastify';
-import formbody from '@fastify/formbody';
 import { config } from './config.js';
 import { healthRoutes } from './routes/health.js';
 import { slackRoutes } from './routes/slack/index.js';
@@ -25,10 +24,6 @@ export async function buildServer() {
           },
         },
   });
-
-  // Plugins
-  // @fastify/formbody parses application/x-www-form-urlencoded — required for Slack slash commands
-  await app.register(formbody);
 
   // Routes
   await app.register(healthRoutes);
