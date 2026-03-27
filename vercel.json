@@ -1,3 +1,6 @@
 {
-  "buildCommand": "turbo run build --filter=@remi/admin..."
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "turbo run build --filter=@remi/admin...",
+  "outputDirectory": "apps/admin/.next"
 }
