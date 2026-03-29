@@ -27,32 +27,29 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
       return;
     }
 
-    // 2. Ensure command is run inside a thread
-    if (!command.thread_ts) {
-      await respond({
-        response_type: 'ephemeral',
-        text: 'Run this command inside a thread, not in the main channel.',
-      });
-      return;
-    }
-
-    // 3. Resolve workspaceId from middleware context
+    // 2. Resolve workspaceId from middleware context
     const workspaceId: string = (context as Record<string, unknown>).workspaceId as string;
     const teamId = command.team_id;
 
+    // thread_ts is present when the command is used inside a thread reply box.
+    // When used from a main channel or DM (no thread_ts), we use 'channel' as a
+    // synthetic anchor so the whole channel conversation is tracked.
+    const threadTs = command.thread_ts ?? 'channel';
+    const isChannelLevel = !command.thread_ts;
+
     try {
-      // 4. Resolve Slack user → Remi User.id (nullable FK — null if user not yet in DB)
+      // 3. Resolve Slack user → Remi User.id (nullable FK — null if user not yet in DB)
       const slackUser = await prisma.slackUser.findUnique({
         where: { slackUserId_slackTeamId: { slackUserId: command.user_id, slackTeamId: teamId } },
       });
       const linkedByUserId = slackUser?.userId ?? null;
 
-      // 5. Upsert SlackThread
+      // 4. Upsert SlackThread
       const thread = await upsertSlackThread(prisma, {
         workspaceId,
         slackTeamId: teamId,
         channelId: command.channel_id,
-        threadTs: command.thread_ts,
+        threadTs,
       });
 
       // 6. Upsert placeholder Issue
@@ -70,7 +67,7 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
       if (existingLink) {
         await respond({
           response_type: 'ephemeral',
-          text: `Already linked *${issueKey}* to this thread.`,
+          text: `Already linked *${issueKey}* to this ${isChannelLevel ? 'channel' : 'thread'}.`,
         });
         return;
       }
@@ -123,7 +120,7 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         metadata: {
           issueKey,
           channelId: command.channel_id,
-          threadTs: command.thread_ts,
+          threadTs,
           slackTeamId: teamId,
         },
       });
@@ -131,7 +128,7 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
       // 10. Respond ephemerally
       await respond({
         response_type: 'ephemeral',
-        text: `Linked *${issueKey}* to this thread. Fetching issue details...`,
+        text: `Linked *${issueKey}* to this ${isChannelLevel ? 'channel' : 'thread'}. Fetching issue details...`,
       });
     } catch (err) {
       logger.error(err);
