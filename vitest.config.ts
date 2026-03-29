@@ -25,6 +25,7 @@ export default defineConfig({
       '@remi/slack': path.resolve(__dirname, 'packages/slack/src/index.ts'),
       '@remi/summary-engine': path.resolve(__dirname, 'packages/summary-engine/src/index.ts'),
       '@remi/email': path.resolve(__dirname, 'packages/email/src/index.ts'),
+      '@remi/gmail': path.resolve(__dirname, 'packages/gmail/src/index.ts'),
     },
   },
 });

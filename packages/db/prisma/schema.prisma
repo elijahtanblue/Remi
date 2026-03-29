@@ -19,9 +19,11 @@ model Workspace {
 
   slackInstalls SlackWorkspaceInstall[]
   jiraInstalls  JiraWorkspaceInstall[]
+  gmailInstalls GmailWorkspaceInstall[]
   users         User[]
   issues        Issue[]
   slackThreads  SlackThread[]
+  emailThreads  EmailThread[]
   summaryRuns   SummaryRun[]
   auditLogs     AuditLog[]
   deadLetters   QueueDeadLetter[]
@@ -148,6 +150,7 @@ model Issue {
   workspace   Workspace         @relation(fields: [workspaceId], references: [id])
   events      IssueEvent[]
   threadLinks IssueThreadLink[]
+  emailLinks  IssueEmailLink[]
   summaries   Summary[]
 
   @@unique([jiraIssueId, jiraSiteUrl])
@@ -315,4 +318,79 @@ model QueueDeadLetter {
 
   @@index([queue, failedAt])
   @@map("queue_dead_letters")
+}
+
+// ─── Gmail Integration ────────────────────────────────────────────────────────
+
+model GmailWorkspaceInstall {
+  id                 String    @id @default(cuid())
+  workspaceId        String    @unique
+  serviceAccountJson String
+  domain             String
+  monitoredEmails    String[]
+  // Stores { "email@domain.com": "historyId" } for incremental sync per mailbox
+  mailboxHistoryIds  Json?
+  installedAt        DateTime  @default(now())
+  uninstalledAt      DateTime?
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id])
+  emailThreads EmailThread[]
+
+  @@map("gmail_workspace_installs")
+}
+
+model EmailThread {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  gmailInstallId String
+  gmailThreadId  String
+  subject        String?
+  participants   Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  gmailInstall GmailWorkspaceInstall @relation(fields: [gmailInstallId], references: [id])
+  workspace    Workspace             @relation(fields: [workspaceId], references: [id])
+  messages     EmailMessage[]
+  issueLinks   IssueEmailLink[]
+
+  @@unique([gmailInstallId, gmailThreadId])
+  @@index([workspaceId])
+  @@map("email_threads")
+}
+
+model EmailMessage {
+  id             String    @id @default(cuid())
+  threadId       String
+  gmailMessageId String    @unique
+  fromEmail      String
+  toEmails       String[]
+  subject        String?
+  bodySnippet    String
+  receivedAt     DateTime
+  idempotencyKey String    @unique
+  processedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  thread EmailThread @relation(fields: [threadId], references: [id])
+
+  @@index([threadId, receivedAt])
+  @@map("email_messages")
+}
+
+model IssueEmailLink {
+  id         String    @id @default(cuid())
+  issueId    String
+  threadId   String
+  method     String
+  linkedAt   DateTime  @default(now())
+  unlinkedAt DateTime?
+
+  issue  Issue       @relation(fields: [issueId], references: [id])
+  thread EmailThread @relation(fields: [threadId], references: [id])
+
+  @@unique([issueId, threadId])
+  @@index([issueId])
+  @@index([threadId])
+  @@map("issue_email_links")
 }

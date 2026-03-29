@@ -7,6 +7,7 @@ import { handleSlackEvent } from './handlers/slack-events.js';
 import { handleSummaryJob } from './handlers/summary-jobs.js';
 import { handleBackfillJob } from './handlers/backfill-jobs.js';
 import type { JiraEventMessage, SlackEventMessage, SummaryJobMessage, BackfillJobMessage } from '@remi/shared';
+import { syncAllGmailWorkspaces } from '@remi/gmail';
 
 const queue =
   config.QUEUE_ADAPTER === 'sqs'
@@ -39,8 +40,28 @@ startConsumer(queue, QueueNames.BACKFILL_JOBS, (msg) =>
 
 console.log(`[worker] Started consuming queues: ${Object.values(QueueNames).join(', ')}`);
 
+// ─── Gmail batch sync ─────────────────────────────────────────────────────────
+// Runs immediately on startup then every 5 minutes.
+// Set GMAIL_SYNC_ENABLED=false on replica workers to prevent concurrent polling.
+// Deduplication is handled by gmailMessageId — re-runs are safe.
+const GMAIL_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+
+let gmailSyncTimer: ReturnType<typeof setInterval> | undefined;
+
+if (config.GMAIL_SYNC_ENABLED) {
+  syncAllGmailWorkspaces().catch((err: unknown) =>
+    console.error('[gmail-sync] Initial sync error:', err),
+  );
+  gmailSyncTimer = setInterval(() => {
+    syncAllGmailWorkspaces().catch((err: unknown) =>
+      console.error('[gmail-sync] Sync error:', err),
+    );
+  }, GMAIL_SYNC_INTERVAL_MS);
+}
+
 process.on('SIGTERM', async () => {
   console.log('[worker] SIGTERM received, stopping...');
+  if (gmailSyncTimer) clearInterval(gmailSyncTimer);
   await queue.stop();
   process.exit(0);
 });

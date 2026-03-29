@@ -97,7 +97,7 @@ pnpm dev
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch**
 2. Enable **Socket Mode** (under Settings → Socket Mode) — this lets you test locally without a public URL
 3. Under **OAuth & Permissions** → Bot Token Scopes, add:
-   `channels:history`, `channels:read`, `chat:write`, `commands`, `im:write`, `users:read`, `app_mentions:read`
+   `channels:history`, `channels:read`, `chat:write`, `commands`, `im:write`, `users:read`, `users:read.email`, `app_mentions:read`
 4. Under **Slash Commands**, add: `/link-ticket` and `/brief`
 5. Under **Event Subscriptions**, add events: `message.channels`, `app_home_opened`
 6. Under **Interactivity & Shortcuts**, add a message shortcut with Callback ID: `attach_to_issue`
@@ -404,17 +404,17 @@ NODE_ENV=production
 
 # Queue (SQS)
 QUEUE_ADAPTER=sqs
-AWS_REGION=us-east-1
+SQS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
-SLACK_EVENTS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-slack-events.fifo
-JIRA_EVENTS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-jira-events.fifo
-SUMMARY_JOBS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
-BACKFILL_JOBS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
+SQS_SLACK_EVENTS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-slack-events.fifo
+SQS_JIRA_EVENTS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-jira-events.fifo
+SQS_SUMMARY_JOBS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
+SQS_BACKFILL_JOBS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
 
 # Storage (S3)
 STORAGE_ADAPTER=s3
-AWS_S3_BUCKET=remi-payloads-your-name
+S3_BUCKET=remi-payloads-your-name
 
 # Slack
 SLACK_SIGNING_SECRET=...
@@ -440,7 +440,7 @@ NEXT_PUBLIC_API_URL=https://api.memoremi.com
 | `DATABASE_URL` | Your RDS endpoint from Step 4 + the password you chose |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | The CSV you downloaded in Step 2 |
 | `SLACK_EVENTS_QUEUE_URL` etc. | The 4 URLs printed in Step 5 |
-| `AWS_S3_BUCKET` | The bucket name you chose in Step 6 |
+| `S3_BUCKET` | The bucket name you chose in Step 6 |
 | `SLACK_SIGNING_SECRET` | Slack app → [api.slack.com/apps](https://api.slack.com/apps) → your app → **Basic Information** → **App Credentials** → Signing Secret |
 | `SLACK_CLIENT_ID` | Same page → **App Credentials** → Client ID |
 | `SLACK_CLIENT_SECRET` | Same page → **App Credentials** → Client Secret (click Show to reveal) |
@@ -815,17 +815,17 @@ NODE_ENV=production
 
 # ─── Queue (SQS) ────────────────────────────────────────────────────────────
 QUEUE_ADAPTER=sqs
-AWS_REGION=us-east-1
+SQS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
-SLACK_EVENTS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-slack-events.fifo
-JIRA_EVENTS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-jira-events.fifo
-SUMMARY_JOBS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
-BACKFILL_JOBS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
+SQS_SLACK_EVENTS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-slack-events.fifo
+SQS_JIRA_EVENTS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-jira-events.fifo
+SQS_SUMMARY_JOBS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
+SQS_BACKFILL_JOBS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
 
 # ─── Storage (S3) ───────────────────────────────────────────────────────────
 STORAGE_ADAPTER=s3
-AWS_S3_BUCKET=remi-payloads-prod
+S3_BUCKET=remi-payloads-prod
 
 # ─── Slack ──────────────────────────────────────────────────────────────────
 # All three values are on: api.slack.com/apps → your app → Basic Information → App Credentials

@@ -45,6 +45,7 @@ const SLACK_BOT_SCOPES = [
   'commands',
   'im:write',
   'users:read',
+  'users:read.email',
   'app_mentions:read',
 ];
 

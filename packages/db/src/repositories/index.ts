@@ -7,3 +7,4 @@ export * from './link.repo.js';
 export * from './summary.repo.js';
 export * from './audit-log.repo.js';
 export * from './dead-letter.repo.js';
+export * from './gmail.repo.js';

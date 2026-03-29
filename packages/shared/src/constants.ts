@@ -39,6 +39,7 @@ export const TriggerReason = {
   PRIORITY_CHANGE: "priority_change",
   NEW_COMMENT: "new_comment",
   SLACK_ACTIVITY: "slack_activity",
+  EMAIL_ACTIVITY: "email_activity",
   MANUAL_REQUEST: "manual_request",
   SCHEDULED: "scheduled",
   BACKFILL_COMPLETE: "backfill_complete",

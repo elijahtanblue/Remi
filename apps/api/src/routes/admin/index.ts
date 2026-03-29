@@ -11,11 +11,14 @@ import {
   listSummariesByWorkspace,
   findSummaryById,
   findIssueById,
+  upsertGmailInstall,
+  findGmailInstall,
 } from '@remi/db';
 import { queue } from '../../queue.js';
 import { config } from '../../config.js';
 import { QueueNames } from '@remi/shared';
 import { v4 as uuidv4 } from 'uuid';
+import { validateGmailConfigBody } from './gmail-config.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   // Auth hook — all /admin/* routes require the X-Admin-Key header
@@ -51,7 +54,7 @@ export async function adminRoutes(app: FastifyInstance) {
       slackTeamName: body.slackTeamName,
       botToken: body.botToken,
       botUserId: body.botUserId,
-      scopes: body.scopes ?? ['channels:history', 'channels:read', 'chat:write', 'commands', 'im:write', 'users:read'],
+      scopes: body.scopes ?? ['channels:history', 'channels:read', 'chat:write', 'commands', 'im:write', 'users:read', 'users:read.email'],
     });
     return reply.code(201).send({ workspace, slackInstall });
   });
@@ -138,6 +141,50 @@ export async function adminRoutes(app: FastifyInstance) {
     await queue.send(dl.queue, dl.payload as unknown as import('@remi/shared').QueueMessage);
     await retryDeadLetter(prisma, id);
     return { ok: true };
+  });
+
+  // POST /admin/gmail/configure
+  // Saves or updates the Google service account for a workspace's Gmail integration.
+  // Body: { workspaceId, serviceAccountJson, domain, monitoredEmails }
+  app.post('/gmail/configure', async (request, reply) => {
+    const body = request.body as {
+      workspaceId: string;
+      serviceAccountJson: string;
+      domain: string;
+      monitoredEmails: string[];
+    };
+
+    const validationError = validateGmailConfigBody(body);
+    if (validationError) {
+      return reply.code(400).send(validationError);
+    }
+
+    // Verify the workspace exists before writing — avoids a FK 500
+    const workspace = await prisma.workspace.findUnique({ where: { id: body.workspaceId } });
+    if (!workspace) {
+      return reply.code(404).send({ error: `Workspace ${body.workspaceId} not found` });
+    }
+
+    const install = await upsertGmailInstall(prisma, {
+      workspaceId: body.workspaceId,
+      serviceAccountJson: body.serviceAccountJson,
+      domain: body.domain,
+      monitoredEmails: body.monitoredEmails ?? [],
+    });
+
+    // Return install without the service account JSON for safety
+    const { serviceAccountJson: _sa, ...safeInstall } = install;
+    return reply.code(200).send({ ok: true, install: safeInstall });
+  });
+
+  // GET /admin/gmail/:workspaceId
+  // Returns the Gmail install config for a workspace (omits service account JSON).
+  app.get('/gmail/:workspaceId', async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const install = await findGmailInstall(prisma, workspaceId);
+    if (!install) return reply.code(404).send({ error: 'Gmail not configured for this workspace' });
+    const { serviceAccountJson: _sa, ...safeInstall } = install;
+    return { install: safeInstall };
   });
 
   // GET /admin/workspaces/:workspaceId/audit-log

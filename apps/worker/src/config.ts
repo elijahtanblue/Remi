@@ -11,6 +11,7 @@ const schema = z.object({
   SQS_BACKFILL_JOBS_URL: z.string().optional(),
   SLACK_BOT_TOKEN: z.string().optional(),
   MAX_RETRY_COUNT: z.coerce.number().default(3),
+  GMAIL_SYNC_ENABLED: z.coerce.boolean().default(true),
 });
 
 export const config = schema.parse(process.env);
