@@ -210,3 +210,34 @@ After domain is live, update these in the Slack app settings:
 | Interactivity & Shortcuts | `https://api.memoremi.com/slack/interactions` |
 
 Disable **Socket Mode** after updating (Settings → Socket Mode → Disable).
+
+---
+
+## Admin Dashboard
+
+### Problem: Admin shows "fetch failed" on all pages
+All admin pages (Workspaces, Summaries, Dead Letters, Audit Log) showed a "fetch failed" error after deployment. The API was healthy and returning correct data — the issue was in the admin Next.js app.
+
+**Root cause:** `apps/admin/src/lib/api.ts` had `API_URL` and `ADMIN_API_KEY` as module-level constants:
+```typescript
+const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+const ADMIN_KEY = process.env.ADMIN_API_KEY ?? 'dev-admin-key';
+```
+Next.js evaluates module-level code at build time (not runtime) in the standalone output mode. The env vars are not available during the Docker build step, so `API_URL` baked in as `'http://localhost:3000'` and `ADMIN_KEY` baked in as `'dev-admin-key'`.
+
+**Fix:** Move the env var reads inside the `apiFetch` function so they are evaluated at request time:
+```typescript
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const apiUrl = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+  const adminKey = process.env.ADMIN_API_KEY ?? 'dev-admin-key';
+  const res = await fetch(`${apiUrl}${path}`, {
+    ...options,
+    headers: { 'x-admin-key': adminKey, 'Content-Type': 'application/json', ...options?.headers },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  return res.json();
+}
+```
+
+**Note:** `API_URL` (server-side, uses Docker internal DNS `http://api:3000`) must be set in `docker-compose.prod.yml` environment, not `NEXT_PUBLIC_API_URL` (which is only available client-side and requires a rebuild to change). Runtime server-side env vars work correctly once reads are inside the function.

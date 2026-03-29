@@ -51,6 +51,10 @@ export async function listWorkspaces(
     take: opts?.limit ?? 50,
     skip: opts?.offset ?? 0,
     orderBy: { createdAt: 'desc' },
+    include: {
+      slackInstalls: { take: 1, orderBy: { installedAt: 'desc' } },
+      jiraInstalls: { take: 1, orderBy: { installedAt: 'desc' } },
+    },
   });
 }
 

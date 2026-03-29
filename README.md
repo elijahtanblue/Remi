@@ -13,11 +13,44 @@ Remi is your team's operational memory. It links Slack threads to Jira issues, t
 
 ## How it works
 
-1. A user runs `/link-ticket PROJ-123` inside a Slack thread
-2. Remi links that thread to the Jira issue and backfills history from both sides
-3. When the Jira issue changes (status, assignee, priority) or new messages arrive, Remi regenerates a summary automatically
-4. Summaries surface in three places: `/brief` in Slack, the Slack App Home, and a panel embedded in the Jira issue sidebar
-5. Summaries are deterministic — no LLM, no API cost, fully auditable
+1. A user installs Remi to their Slack workspace via the Add to Slack button
+2. They connect their Jira site by following the setup instructions sent to their Slack DMs
+3. A user runs `/link-ticket PROJ-123` inside a Slack thread to link it to a Jira issue
+4. Remi backfills history from both Slack and Jira, then generates a summary
+5. Any new messages in the thread or changes to the Jira issue automatically regenerate the summary
+6. Summaries surface in `/brief` in Slack, the Slack App Home, and a panel in the Jira issue sidebar
+7. Summaries are deterministic — no LLM, no API cost, fully auditable
+
+---
+
+## Installing Remi
+
+### Step 1 — Add Remi to Slack
+
+Click the button below (or navigate to the URL directly):
+
+**[Add to Slack →](https://api.memoremi.com/slack/install)**
+
+This takes you to Slack's OAuth authorization page. Review the permissions and click **Allow**.
+
+After approving, you will be redirected to a confirmation page and Remi will send you a direct message in Slack with instructions for the next step.
+
+### Step 2 — Connect Jira
+
+After the Slack install, Remi sends you a DM containing a **Jira descriptor URL** unique to your workspace. To connect Jira:
+
+1. In Jira, go to **Apps → Manage your apps**
+2. Click **Upload app** (or **Install a private app** if on an older Jira version)
+3. Paste the descriptor URL from your Slack DM and click **Upload**
+4. Jira will confirm the app is installed
+
+Once installed, the **Remi Summary** panel will appear on any Jira issue you link.
+
+> **Note:** Atlassian ended new Connect app installs via descriptor URL on March 31, 2026. If your Jira tenant does not support this, contact Remi support for alternatives.
+
+### That's it
+
+Both integrations are now live. Head to any Slack thread and run `/link-ticket PROJ-123` to link your first issue.
 
 ---
 
@@ -27,8 +60,9 @@ Remi is your team's operational memory. It links Slack threads to Jira issues, t
 
 | Command | What it does |
 |---|---|
-| `/link-ticket PROJ-123` | Links the current Slack thread to Jira issue PROJ-123 |
-| `/brief PROJ-123` | Posts the current summary for PROJ-123 in Slack |
+| `/link-ticket ISSUE-KEY` | Links the current Slack thread to a Jira issue (e.g. `/link-ticket PROJ-123`) |
+| `/brief ISSUE-KEY` | Posts the current summary for that issue in Slack |
+| `/brief ISSUE-KEY --refresh` | Forces a summary regeneration before posting |
 
 Run these commands **inside the Slack thread** you want to link — not in a DM or unrelated channel.
 
@@ -49,7 +83,7 @@ Run these commands **inside the Slack thread** you want to link — not in a DM 
 - Type `/brief PROJ-123` anywhere in your workspace to see the latest summary posted as a message
 
 **In Jira:**
-- Open any issue that has been linked — look for the **Remi Summary** panel in the right sidebar
+- Open any linked issue — look for the **Remi Summary** panel in the right sidebar
 - The panel shows: current summary, linked thread count, completeness score, and recommended next step
 
 **In Slack App Home:**
@@ -67,7 +101,7 @@ Remi regenerates the summary automatically when any of these happen:
 - The Jira issue assignee changes
 - The Jira issue priority changes
 - A comment is added or updated on the Jira issue
-- You run `/brief PROJ-123 --refresh` to force a regeneration
+- You run `/brief ISSUE-KEY --refresh` to force a regeneration
 
 ---
 
@@ -100,9 +134,7 @@ You can also link a thread using the Slack message shortcut (no typing required)
 
 The admin dashboard at [admin.memoremi.com](https://admin.memoremi.com) is for operators, not end users. It shows:
 
-- **Dashboard** — overview of all workspaces and recent activity
-- **Integrations** — Slack and Jira install status per workspace
-- **Workspaces** — list of all connected workspaces
+- **Workspaces** — every Slack workspace that has installed Remi, with their Jira site
 - **Summaries** — full summary history with completeness scores and a re-run button
 - **Dead Letters** — failed jobs that need attention, with a retry button
 - **Audit Log** — complete record of every action Remi has taken
@@ -130,7 +162,7 @@ No external API calls. No hallucination risk. Every summary is regeneratable fro
 
 ```
 apps/
-  api/        Fastify API server (Slack + Jira webhooks, admin routes)
+  api/        Fastify API server (Slack + Jira webhooks, OAuth, admin routes)
   worker/     SQS consumer for async processing
   admin/      Next.js ops dashboard
 
@@ -139,7 +171,7 @@ packages/
   db/             Prisma schema + client + repositories
   queue/          Queue abstraction (SQS in prod, in-memory in dev)
   storage/        Storage abstraction (S3 in prod, local files in dev)
-  slack/          Slack Bolt handlers, commands, views
+  slack/          Slack Bolt handlers, commands, views, OAuth
   jira/           Jira Connect auth, REST client, webhook parser, panel
   summary-engine/ Deterministic summary generation
 ```

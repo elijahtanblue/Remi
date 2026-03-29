@@ -95,15 +95,20 @@ pnpm dev
 ### 6. Set up the Slack app
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch**
-2. Enable **Socket Mode** (under Settings → Socket Mode)
+2. Enable **Socket Mode** (under Settings → Socket Mode) — this lets you test locally without a public URL
 3. Under **OAuth & Permissions** → Bot Token Scopes, add:
-   `channels:history`, `channels:read`, `chat:write`, `commands`, `im:write`, `users:read`
+   `channels:history`, `channels:read`, `chat:write`, `commands`, `im:write`, `users:read`, `app_mentions:read`
 4. Under **Slash Commands**, add: `/link-ticket` and `/brief`
 5. Under **Event Subscriptions**, add events: `message.channels`, `app_home_opened`
 6. Under **Interactivity & Shortcuts**, add a message shortcut with Callback ID: `attach_to_issue`
-7. Copy the **Bot Token**, **Signing Secret**, and **App Token** into your `.env`
+7. Copy into your `.env`:
+   - **Bot Token** → OAuth & Permissions → Bot User OAuth Token (starts with `xoxb-`)
+   - **Signing Secret** → Basic Information → App Credentials → Signing Secret
+   - **App Token** → Basic Information → App-Level Tokens → generate one with `connections:write` scope (starts with `xapp-`)
 
 Socket Mode means no public URL is needed for local development.
+
+> **Note:** Client ID and Client Secret (also shown on Basic Information → App Credentials) are only needed for the production OAuth install flow — you don't need them for local dev.
 
 ### 7. Set up Jira (optional — requires a public URL)
 
@@ -412,8 +417,9 @@ STORAGE_ADAPTER=s3
 AWS_S3_BUCKET=remi-payloads-your-name
 
 # Slack
-SLACK_BOT_TOKEN=xoxb-...
 SLACK_SIGNING_SECRET=...
+SLACK_CLIENT_ID=...
+SLACK_CLIENT_SECRET=...
 SLACK_SOCKET_MODE=false
 
 # API
@@ -435,8 +441,9 @@ NEXT_PUBLIC_API_URL=https://api.memoremi.com
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | The CSV you downloaded in Step 2 |
 | `SLACK_EVENTS_QUEUE_URL` etc. | The 4 URLs printed in Step 5 |
 | `AWS_S3_BUCKET` | The bucket name you chose in Step 6 |
-| `SLACK_BOT_TOKEN` | Slack app → OAuth & Permissions → Bot User OAuth Token |
-| `SLACK_SIGNING_SECRET` | Slack app → Basic Information → Signing Secret |
+| `SLACK_SIGNING_SECRET` | Slack app → [api.slack.com/apps](https://api.slack.com/apps) → your app → **Basic Information** → **App Credentials** → Signing Secret |
+| `SLACK_CLIENT_ID` | Same page → **App Credentials** → Client ID |
+| `SLACK_CLIENT_SECRET` | Same page → **App Credentials** → Client Secret (click Show to reveal) |
 | `ADMIN_API_KEY` | Make up a random password (run `openssl rand -hex 32` to generate one) |
 | `BASE_URL` | `https://api.memoremi.com` (after DNS is set up in Step 14) |
 
@@ -527,29 +534,65 @@ After completing Step 14 (domain + HTTPS), these become:
 
 ### Step 12: Connect Slack to your live server
 
-Now you'll point your Slack app at your real server instead of your laptop.
+Now you'll point your Slack app at your real server and enable the OAuth install flow.
 
 > **Your web browser → [api.slack.com/apps](https://api.slack.com/apps)**
 
-1. Click your app → **Event Subscriptions** → turn on Events
-2. Set **Request URL** to: `https://api.memoremi.com/slack/events`
-3. Under **Subscribe to bot events**, add: `message.channels`, `app_home_opened`
-4. Save changes
+#### A. Enable OAuth and set the redirect URL
 
-5. Click **Slash Commands** → edit each command:
+1. Click your app → **OAuth & Permissions**
+2. Under **Redirect URLs**, click **Add New Redirect URL** and add:
+   ```
+   https://api.memoremi.com/slack/oauth_redirect
+   ```
+3. Click **Save URLs**
+
+#### B. Point webhooks at your live server
+
+4. Click **Event Subscriptions** → turn on Events
+5. Set **Request URL** to: `https://api.memoremi.com/slack/events`
+6. Under **Subscribe to bot events**, add: `message.channels`, `app_home_opened`
+7. Save changes
+
+8. Click **Slash Commands** → edit each command:
    - `/link-ticket` → Request URL: `https://api.memoremi.com/slack/commands`
    - `/brief` → Request URL: `https://api.memoremi.com/slack/commands`
 
-6. Click **Interactivity & Shortcuts** → turn on Interactivity
+9. Click **Interactivity & Shortcuts** → turn on Interactivity
    - Request URL: `https://api.memoremi.com/slack/interactions`
 
-7. Click **Socket Mode** → **Disable Socket Mode** (you have a real URL now)
+10. Click **Socket Mode** → **Disable Socket Mode** (you have a real URL now)
 
-8. Click **Install to Workspace** (or reinstall if already installed)
+#### C. Add OAuth credentials to your server
+
+Make sure `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, and `SLACK_SIGNING_SECRET` are set in your `.env.prod` (from Step 9) — these are all on the **Basic Information → App Credentials** page.
+
+Redeploy after adding them:
+```bash
+cd ~/remi
+cp ~/.env.prod .env.prod
+docker compose -f docker-compose.prod.yml up -d
+```
+
+#### D. Test the install flow
+
+Open `https://api.memoremi.com/slack/install` in a browser — you should be redirected to Slack's authorization page. After approving, you'll land on a success page and receive a welcome DM in Slack with Jira setup instructions.
+
+> New teams can now install Remi by visiting `https://api.memoremi.com/slack/install`.
 
 ---
 
 ### Step 13: Connect Jira to your live server
+
+#### Recommended: use the welcome DM (self-serve)
+
+After completing the Slack OAuth install (Step 12D), Remi sends the installer a direct message in Slack containing a **personal Jira descriptor URL** with your workspace ID already embedded. Use that URL — it looks like:
+
+```
+https://api.memoremi.com/jira/atlassian-connect.json?workspaceId=<your-workspace-id>
+```
+
+To install using that URL:
 
 > You must be an **Organization admin** or **Site admin** on Atlassian to do this.
 
@@ -559,14 +602,22 @@ Now you'll point your Slack app at your real server instead of your laptop.
 4. Click **Connected apps** in the left sidebar
 5. Click the **Settings** tab → enable **Development mode**
 6. Click **Install a private app**
-7. Select which Atlassian apps to connect to (choose Jira)
-8. Paste your app descriptor URL:
-   ```
-   https://api.memoremi.com/jira/atlassian-connect.json
-   ```
-9. Click **Install app**
+7. Paste the descriptor URL from your Slack DM (the one with `?workspaceId=...`)
+8. Click **Install app**
 
-Remi should now appear as an installed app in Jira and show a panel on your issues.
+Remi will appear as an installed app in Jira and show a **Remi Summary** panel on your issues.
+
+#### Alternative: Jira-first install (no Slack yet)
+
+If you want to install the Jira app before setting up Slack, you can use the descriptor URL without a `workspaceId`:
+
+```
+https://api.memoremi.com/jira/atlassian-connect.json
+```
+
+Remi will automatically create a workspace for your Jira site. You can link it to Slack later via the OAuth flow.
+
+> **Note:** Atlassian ended new Connect app installs via descriptor URL on **March 31, 2026**. This method only works for apps already installed before that date or for sites with development mode enabled. After that date, migration to Forge is required.
 
 ---
 
@@ -593,11 +644,11 @@ nslookup api.memoremi.com
 
 > **Server terminal (SSH session)**
 
-```bash
-# Install Caddy
-sudo yum install -y caddy
+> **Important:** `sudo yum install -y caddy` fails on Amazon Linux 2023 — Caddy is not in the default repos. Run Caddy as a Docker container instead (Docker is already installed on your server from Step 8):
 
-# Create the Caddy config
+```bash
+# Create the Caddy config directory and file
+sudo mkdir -p /etc/caddy
 sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
 api.memoremi.com {
     reverse_proxy localhost:3000
@@ -608,11 +659,21 @@ admin.memoremi.com {
 }
 EOF
 
-sudo systemctl enable caddy
-sudo systemctl start caddy
+# Run Caddy as a Docker container with host networking
+# --network host lets Caddy reach localhost:3000 and localhost:3001 (your app containers)
+# --restart unless-stopped ensures it comes back after a server reboot
+docker run -d \
+  --name caddy \
+  --restart unless-stopped \
+  --network host \
+  -v /etc/caddy/Caddyfile:/etc/caddy/Caddyfile \
+  -v caddy_data:/data \
+  caddy:latest
 ```
 
-Caddy automatically obtains and renews TLS certificates from Let's Encrypt — no manual certificate management needed.
+Caddy automatically obtains and renews TLS certificates from Let's Encrypt. `--network host` is required so Caddy can reach your app containers via `localhost`.
+
+> **DNS must be pointing at your EC2 IP before running Caddy**, otherwise Let's Encrypt certificate provisioning will fail. Also ensure Cloudflare proxy (orange cloud) is OFF — use DNS-only (grey cloud) mode so Caddy can validate the certificate directly.
 
 #### C. Restart the containers
 
@@ -767,10 +828,12 @@ STORAGE_ADAPTER=s3
 AWS_S3_BUCKET=remi-payloads-prod
 
 # ─── Slack ──────────────────────────────────────────────────────────────────
-SLACK_BOT_TOKEN=xoxb-...
+# All three values are on: api.slack.com/apps → your app → Basic Information → App Credentials
 SLACK_SIGNING_SECRET=...
+SLACK_CLIENT_ID=...          # enables the /slack/install OAuth flow
+SLACK_CLIENT_SECRET=...      # enables the /slack/install OAuth flow
 SLACK_SOCKET_MODE=false
-# SLACK_APP_TOKEN only needed in dev Socket Mode
+# SLACK_BOT_TOKEN and SLACK_APP_TOKEN only needed in dev Socket Mode
 
 # ─── API ────────────────────────────────────────────────────────────────────
 PORT=3000

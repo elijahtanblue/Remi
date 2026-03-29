@@ -29,10 +29,10 @@ export default async function WorkspacesPage() {
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Slug</th>
+              <th>Slack Workspace</th>
+              <th>Jira Site</th>
               <th>ID</th>
-              <th>Created At</th>
+              <th>Connected</th>
             </tr>
           </thead>
           <tbody>
@@ -43,24 +43,37 @@ export default async function WorkspacesPage() {
                 </td>
               </tr>
             ) : (
-              workspaces.map((ws) => (
-                <tr key={ws.id}>
-                  <td>
-                    <Link href={`/workspaces/${ws.id}`} style={{ fontWeight: 500 }}>
-                      {ws.name ?? '—'}
-                    </Link>
-                  </td>
-                  <td>
-                    <code style={{ fontSize: '13px' }}>{ws.slug ?? '—'}</code>
-                  </td>
-                  <td>
-                    <code style={{ fontSize: '12px', color: '#6c757d' }}>{ws.id}</code>
-                  </td>
-                  <td style={{ color: '#6c757d', fontSize: '13px' }}>
-                    {ws.createdAt ? new Date(ws.createdAt).toLocaleString() : '—'}
-                  </td>
-                </tr>
-              ))
+              workspaces.map((ws) => {
+                const slackName = ws.slackInstalls?.[0]?.slackTeamName ?? ws.name;
+                const jiraSite = ws.jiraInstalls?.[0]?.jiraSiteUrl;
+                return (
+                  <tr key={ws.id}>
+                    <td>
+                      <Link href={`/workspaces/${ws.id}`} style={{ fontWeight: 500 }}>
+                        {slackName}
+                      </Link>
+                      {ws.slackInstalls?.[0] ? null : (
+                        <span style={{ marginLeft: '8px', fontSize: '12px', color: '#6c757d' }}>
+                          (no Slack)
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: '13px' }}>
+                      {jiraSite ? (
+                        <code style={{ fontSize: '13px' }}>{jiraSite.replace('https://', '')}</code>
+                      ) : (
+                        <span style={{ color: '#6c757d' }}>not connected</span>
+                      )}
+                    </td>
+                    <td>
+                      <code style={{ fontSize: '12px', color: '#6c757d' }}>{ws.id}</code>
+                    </td>
+                    <td style={{ color: '#6c757d', fontSize: '13px' }}>
+                      {ws.createdAt ? new Date(ws.createdAt).toLocaleString() : '—'}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

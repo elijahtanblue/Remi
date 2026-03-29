@@ -9,6 +9,8 @@ const schema = z.object({
   SLACK_SIGNING_SECRET: z.string(),
   SLACK_APP_TOKEN: z.string().optional(), // for socket mode
   SLACK_SOCKET_MODE: z.coerce.boolean().default(false),
+  SLACK_CLIENT_ID: z.string().optional(),
+  SLACK_CLIENT_SECRET: z.string().optional(),
   // Queue
   QUEUE_ADAPTER: z.enum(['memory', 'sqs']).default('memory'),
   SQS_REGION: z.string().default('us-east-1'),

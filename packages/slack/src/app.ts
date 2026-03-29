@@ -5,11 +5,17 @@ const require = createRequire(import.meta.url);
 const { App: BoltApp, SocketModeReceiver } =
   require('@slack/bolt') as typeof import('@slack/bolt');
 
+export interface SlackAuthorizeResult {
+  botToken: string;
+  botUserId: string;
+}
+
 export interface SlackAppConfig {
   signingSecret: string;
   botToken?: string;
   appToken?: string; // for Socket Mode
   socketMode?: boolean;
+  authorize?: (context: { teamId?: string; enterpriseId?: string }) => Promise<SlackAuthorizeResult>;
 }
 
 export function createSlackApp(config: SlackAppConfig): SlackApp {
@@ -23,6 +29,13 @@ export function createSlackApp(config: SlackAppConfig): SlackApp {
     return new BoltApp({
       token: config.botToken,
       receiver,
+    });
+  }
+
+  if (config.authorize) {
+    return new BoltApp({
+      signingSecret: config.signingSecret,
+      authorize: config.authorize,
     });
   }
 
