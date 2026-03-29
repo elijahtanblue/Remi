@@ -4,7 +4,7 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   DATABASE_URL: z.string(),
   QUEUE_ADAPTER: z.enum(['memory', 'sqs']).default('memory'),
-  SQS_REGION: z.string().default('us-east-1'),
+  SQS_REGION: z.string().default('ap-southeast-2'),
   SQS_SLACK_EVENTS_URL: z.string().optional(),
   SQS_JIRA_EVENTS_URL: z.string().optional(),
   SQS_SUMMARY_JOBS_URL: z.string().optional(),

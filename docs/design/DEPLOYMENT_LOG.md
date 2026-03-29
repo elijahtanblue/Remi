@@ -241,3 +241,42 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 ```
 
 **Note:** `API_URL` (server-side, uses Docker internal DNS `http://api:3000`) must be set in `docker-compose.prod.yml` environment, not `NEXT_PUBLIC_API_URL` (which is only available client-side and requires a rebuild to change). Runtime server-side env vars work correctly once reads are inside the function.
+
+---
+
+## Gmail Integration (V0.4)
+
+### AWS Region: ap-southeast-2 (Sydney)
+All AWS resources (SQS queues, S3 bucket, RDS) are provisioned in `ap-southeast-2`. Config defaults in `apps/api/src/config.ts` and `apps/worker/src/config.ts` have been updated to reflect this. `docs/business/SETUP.md` examples also use `ap-southeast-2`.
+
+### SETUP.md env var corrections
+The root `SETUP.md` was moved to `docs/business/SETUP.md` as part of a docs reorganisation. Two env var names in that file were wrong relative to what the code actually reads:
+- `AWS_REGION` → `SQS_REGION` (the SQS adapter reads `SQS_REGION`, not `AWS_REGION`)
+- `AWS_S3_BUCKET` → `S3_BUCKET` (the storage adapter reads `S3_BUCKET`)
+
+### Gmail configure endpoint
+After running the workspace bootstrap step above, configure Gmail domain-wide delegation:
+```bash
+curl -s -X POST \
+  -H "x-admin-key: YOUR_ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workspaceId": "<workspace.id>",
+    "serviceAccountJson": "<contents of service account JSON file>",
+    "domain": "yourcompany.com",
+    "monitoredEmails": ["alice@yourcompany.com", "support@yourcompany.com"]
+  }' \
+  "https://api.memoremi.com/admin/gmail/configure"
+```
+
+The response omits `serviceAccountJson` for safety. Verify with:
+```bash
+curl -s -H "x-admin-key: YOUR_ADMIN_API_KEY" \
+  "https://api.memoremi.com/admin/gmail/YOUR_WORKSPACE_ID"
+```
+
+### Multi-worker: prevent duplicate Gmail polling
+If running more than one worker replica, set `GMAIL_SYNC_ENABLED=false` on all replicas except one. Only the designated worker polls Gmail every 5 minutes. The idempotency key on `EmailMessage` prevents duplicate records if two workers do race, but the API quota waste is avoided by the env guard.
+
+### Slack scope: users:read.email required
+`users.lookupByEmail` (used to find Slack users for DM notifications) requires the `users:read.email` OAuth scope in addition to `users:read`. Ensure this scope is present in your Slack app's OAuth configuration at api.slack.com/apps → OAuth & Permissions → Scopes → Bot Token Scopes.

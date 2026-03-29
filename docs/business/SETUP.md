@@ -215,7 +215,7 @@ Enter the values from the CSV file you downloaded in Step 2:
 ```
 AWS Access Key ID: [paste from CSV]
 AWS Secret Access Key: [paste from CSV]
-Default region name: us-east-1
+Default region name: ap-southeast-2
 Default output format: json
 ```
 
@@ -238,11 +238,11 @@ Default output format: json
 11. Under **Additional configuration**, set Initial database name: `remi`
 12. Click **Create database** — this takes 5–10 minutes
 
-Once created, click the database → note the **Endpoint** (it looks like `remi-prod.xxxxxxxxx.us-east-1.rds.amazonaws.com`).
+Once created, click the database → note the **Endpoint** (it looks like `remi-prod.xxxxxxxxx.ap-southeast-2.rds.amazonaws.com`).
 
 Your database connection string will be:
 ```
-postgresql://remi:YOUR_PASSWORD@remi-prod.xxxxxxxxx.us-east-1.rds.amazonaws.com:5432/remi
+postgresql://remi:YOUR_PASSWORD@remi-prod.xxxxxxxxx.ap-southeast-2.rds.amazonaws.com:5432/remi
 ```
 
 > **Security note:** After setting up, you can make RDS private by setting "Public access" to No and only allowing access from your EC2 instance's security group.
@@ -260,13 +260,13 @@ for queue in slack-events jira-events summary-jobs backfill-jobs; do
   aws sqs create-queue \
     --queue-name "remi-${queue}.fifo" \
     --attributes FifoQueue=true,ContentBasedDeduplication=true \
-    --region us-east-1
+    --region ap-southeast-2
 done
 ```
 
 Each command prints a URL — **copy all 4 URLs** and save them. They look like:
 ```
-https://sqs.us-east-1.amazonaws.com/123456789012/remi-slack-events.fifo
+https://sqs.ap-southeast-2.amazonaws.com/123456789012/remi-slack-events.fifo
 ```
 
 ---
@@ -280,7 +280,7 @@ Replace `your-name` with something unique (bucket names must be globally unique)
 ```bash
 aws s3api create-bucket \
   --bucket remi-payloads-your-name \
-  --region us-east-1
+  --region ap-southeast-2
 
 # Block all public access (keeps your data private)
 aws s3api put-public-access-block \
@@ -404,13 +404,13 @@ NODE_ENV=production
 
 # Queue (SQS)
 QUEUE_ADAPTER=sqs
-SQS_REGION=us-east-1
+SQS_REGION=ap-southeast-2
 AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
-SQS_SLACK_EVENTS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-slack-events.fifo
-SQS_JIRA_EVENTS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-jira-events.fifo
-SQS_SUMMARY_JOBS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
-SQS_BACKFILL_JOBS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
+SQS_SLACK_EVENTS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-slack-events.fifo
+SQS_JIRA_EVENTS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-jira-events.fifo
+SQS_SUMMARY_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
+SQS_BACKFILL_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
 
 # Storage (S3)
 STORAGE_ADAPTER=s3
@@ -815,13 +815,13 @@ NODE_ENV=production
 
 # ─── Queue (SQS) ────────────────────────────────────────────────────────────
 QUEUE_ADAPTER=sqs
-SQS_REGION=us-east-1
+SQS_REGION=ap-southeast-2
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
-SQS_SLACK_EVENTS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-slack-events.fifo
-SQS_JIRA_EVENTS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-jira-events.fifo
-SQS_SUMMARY_JOBS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
-SQS_BACKFILL_JOBS_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
+SQS_SLACK_EVENTS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-slack-events.fifo
+SQS_JIRA_EVENTS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-jira-events.fifo
+SQS_SUMMARY_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
+SQS_BACKFILL_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
 
 # ─── Storage (S3) ───────────────────────────────────────────────────────────
 STORAGE_ADAPTER=s3

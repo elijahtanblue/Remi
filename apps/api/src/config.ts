@@ -13,7 +13,7 @@ const schema = z.object({
   SLACK_CLIENT_SECRET: z.string().optional(),
   // Queue
   QUEUE_ADAPTER: z.enum(['memory', 'sqs']).default('memory'),
-  SQS_REGION: z.string().default('us-east-1'),
+  SQS_REGION: z.string().default('ap-southeast-2'),
   SQS_SLACK_EVENTS_URL: z.string().optional(),
   SQS_JIRA_EVENTS_URL: z.string().optional(),
   SQS_SUMMARY_JOBS_URL: z.string().optional(),
@@ -21,7 +21,7 @@ const schema = z.object({
   // Storage
   STORAGE_ADAPTER: z.enum(['local', 's3']).default('local'),
   S3_BUCKET: z.string().optional(),
-  S3_REGION: z.string().default('us-east-1'),
+  S3_REGION: z.string().default('ap-southeast-2'),
   // Admin
   ADMIN_API_KEY: z.string().default('dev-admin-key'),
   // App base URL (for Jira Connect descriptor)
