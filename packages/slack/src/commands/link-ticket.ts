@@ -13,38 +13,82 @@ import {
 
 const ISSUE_KEY_RE = /^[A-Z]+-\d+$/;
 
+// Parses a Slack mention token from slash command text.
+// Slack sends @mentions as <@U12345> or <@U12345|displayname>.
+// Also handles plain @username if the user types it without autocomplete.
+function parseMention(token: string): { slackUserId: string | null; displayName: string | null } {
+  if (!token) return { slackUserId: null, displayName: null };
+
+  // Slack autocomplete format: <@U12345> or <@U12345|firstname.lastname>
+  const slackMentionMatch = token.match(/^<@([A-Z0-9]+)(?:\|([^>]+))?>$/);
+  if (slackMentionMatch) {
+    return {
+      slackUserId: slackMentionMatch[1],
+      displayName: slackMentionMatch[2] ?? null,
+    };
+  }
+
+  // Plain @username typed without autocomplete
+  if (token.startsWith('@')) {
+    return { slackUserId: null, displayName: token.slice(1) };
+  }
+
+  return { slackUserId: null, displayName: null };
+}
+
 export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void {
-  app.command('/link-ticket', async ({ command, ack, respond, context, logger }) => {
+  app.command('/link-ticket', async ({ command, ack, respond, client, context, logger }) => {
     await ack();
 
-    // 1. Parse and validate issue key
-    const issueKey = command.text.trim().toUpperCase();
+    // 1. Parse command text: /link-ticket ISSUE-KEY [@assignee]
+    const parts = command.text.trim().split(/\s+/);
+    const issueKey = (parts[0] ?? '').toUpperCase();
+    const mentionToken = parts[1] ?? '';
+
     if (!ISSUE_KEY_RE.test(issueKey)) {
       await respond({
         response_type: 'ephemeral',
-        text: `Invalid issue key: *${issueKey || '(empty)'}*. Expected format: \`PROJECT-123\``,
+        text: `Invalid issue key: *${issueKey || '(empty)'}*. Expected format: \`PROJECT-123\`\nUsage: \`/link-ticket PROJECT-123\` or \`/link-ticket PROJECT-123 @username\``,
       });
       return;
     }
 
-    // 2. Resolve workspaceId from middleware context
+    // 2. Parse optional assignee mention
+    const { slackUserId: mentionedUserId, displayName: mentionedName } = parseMention(mentionToken);
+
+    // 3. Resolve workspaceId from middleware context
     const workspaceId: string = (context as Record<string, unknown>).workspaceId as string;
     const teamId = command.team_id;
 
-    // thread_ts is present when the command is used inside a thread reply box.
-    // When used from a main channel or DM (no thread_ts), we use 'channel' as a
+    // thread_ts is present when used inside a thread reply box.
+    // When used from a main channel or DM (no thread_ts), use 'channel' as a
     // synthetic anchor so the whole channel conversation is tracked.
     const threadTs = command.thread_ts ?? 'channel';
     const isChannelLevel = !command.thread_ts;
 
     try {
-      // 3. Resolve Slack user → Remi User.id (nullable FK — null if user not yet in DB)
+      // 4. If a Slack user ID was mentioned, look up their real display name
+      let assigneeName: string | null = mentionedName;
+      if (mentionedUserId && !assigneeName) {
+        try {
+          const userInfo = await client.users.info({ user: mentionedUserId });
+          assigneeName =
+            userInfo.user?.profile?.display_name ||
+            userInfo.user?.profile?.real_name ||
+            userInfo.user?.name ||
+            null;
+        } catch {
+          // Non-fatal — proceed without resolved name
+        }
+      }
+
+      // 5. Resolve Slack user → Remi User.id (nullable FK)
       const slackUser = await prisma.slackUser.findUnique({
         where: { slackUserId_slackTeamId: { slackUserId: command.user_id, slackTeamId: teamId } },
       });
       const linkedByUserId = slackUser?.userId ?? null;
 
-      // 4. Upsert SlackThread
+      // 6. Upsert SlackThread
       const thread = await upsertSlackThread(prisma, {
         workspaceId,
         slackTeamId: teamId,
@@ -52,7 +96,7 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         threadTs,
       });
 
-      // 6. Upsert placeholder Issue
+      // 7. Upsert placeholder Issue — include Slack-specified assignee if provided
       const issue = await upsertIssue(prisma, {
         workspaceId,
         jiraIssueId: issueKey,
@@ -60,9 +104,10 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         jiraSiteUrl: 'pending',
         title: issueKey,
         status: 'Unknown',
+        ...(assigneeName ? { assigneeDisplayName: assigneeName } : {}),
       });
 
-      // 7. Check if already linked, then create IssueThreadLink
+      // 8. Check for existing link
       const existingLink = await findIssueThreadLink(prisma, issue.id, thread.id);
       if (existingLink) {
         await respond({
@@ -78,7 +123,7 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         linkedByUserId: linkedByUserId ?? undefined,
       });
 
-      // 8. Enqueue both backfill jobs — Jira changelog + Slack thread history
+      // 9. Enqueue backfill jobs — Jira changelog + Slack thread history
       const jiraBackfillKey = uuidv4();
       await queue.send(QueueNames.BACKFILL_JOBS, {
         id: jiraBackfillKey,
@@ -109,7 +154,7 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         },
       });
 
-      // 9. Write AuditLog
+      // 10. Write AuditLog
       await createAuditLog(prisma, {
         workspaceId,
         action: 'issue_thread_linked',
@@ -122,13 +167,17 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
           channelId: command.channel_id,
           threadTs,
           slackTeamId: teamId,
+          ...(assigneeName ? { assignedTo: assigneeName } : {}),
+          ...(mentionedUserId ? { assignedSlackUserId: mentionedUserId } : {}),
         },
       });
 
-      // 10. Respond ephemerally
+      // 11. Confirm
+      const locationLabel = isChannelLevel ? 'channel' : 'thread';
+      const assigneeLabel = assigneeName ? ` — assigned to *${assigneeName}*` : '';
       await respond({
         response_type: 'ephemeral',
-        text: `Linked *${issueKey}* to this ${isChannelLevel ? 'channel' : 'thread'}. Fetching issue details...`,
+        text: `Linked *${issueKey}* to this ${locationLabel}${assigneeLabel}. Fetching issue details...`,
       });
     } catch (err) {
       logger.error(err);

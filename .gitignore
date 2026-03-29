@@ -14,3 +14,6 @@ dist/
 coverage/
 .prisma/
 AI_decisions.md
+.claude/settings.local.json
+.claude/settings.json
+settings.local.json
