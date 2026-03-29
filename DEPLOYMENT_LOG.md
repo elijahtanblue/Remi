@@ -119,32 +119,69 @@ sudo xfs_growfs /
 ## Database
 
 ### Problem: `The table 'public.workspaces' does not exist`
-Migrations had never been run against the production RDS database.
+Tables had never been created in the production RDS database.
 
-**Fix:** Run migrations manually:
+**Root cause:** The project uses `prisma db push` (no migration files exist). The deploy workflow was incorrectly calling `db:migrate:prod` (`prisma migrate deploy`) which found no migration files and did nothing.
+
+**Fix — run manually on first deploy:**
 ```bash
 cd ~/remi
-docker-compose -f docker-compose.prod.yml run --rm api pnpm --filter @remi/db db:migrate:prod
+docker-compose -f docker-compose.prod.yml run --rm api pnpm --filter @remi/db db:push --accept-data-loss
 ```
+
+**Fix — deploy workflow** (`.github/workflows/deploy.yml`): changed from `db:migrate:prod` to `db:push --accept-data-loss` so future deploys apply schema changes automatically.
+
+---
+
+## Workspace Bootstrap
+
+### Problem: `{"workspaces":[]}` — no workspace exists after DB is created
+There is no OAuth install flow. Workspaces are never auto-created. The `workspaceResolverMiddleware` only looks up existing workspaces — it does not create them. Opening the Slack App Home does not create a workspace either.
+
+**Fix:** A `POST /admin/workspaces` bootstrap endpoint was added to `apps/api/src/routes/admin/index.ts`.
+
+**One-time setup after first deploy:**
+
+Step 1 — get your Slack team ID and bot user ID:
+```bash
+source ~/remi/.env.prod
+curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" "https://slack.com/api/auth.test"
+# note the "team_id" and "user_id" fields
+```
+
+Step 2 — create the workspace:
+```bash
+curl -s -X POST \
+  -H "x-admin-key: YOUR_ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Remi",
+    "slug": "remi",
+    "slackTeamId": "T_YOUR_TEAM_ID",
+    "slackTeamName": "Your Workspace Name",
+    "botToken": "xoxb-your-token",
+    "botUserId": "U_YOUR_BOT_USER_ID"
+  }' \
+  "https://api.memoremi.com/admin/workspaces"
+```
+
+Step 3 — note the `workspace.id` from the response. You'll need it for the Jira install.
 
 ---
 
 ## Jira Connect App
 
 ### Problem: "Something went wrong" when installing via descriptor URL
-The descriptor URL `https://api.memoremi.com/jira/atlassian-connect.json` was being fetched without a `workspaceId` query param. This caused the lifecycle `installed` callback to fire with `workspaceId=unknown`, which fails the DB foreign key constraint.
+The descriptor URL `https://api.memoremi.com/jira/atlassian-connect.json` was pasted without a `workspaceId` query param. This caused the lifecycle `installed` callback to fire with `workspaceId=unknown`, which fails the DB foreign key constraint.
 
-**Fix:** Install using the descriptor URL with a real workspace ID:
-1. Get your workspace ID:
-   ```bash
-   curl -H "x-admin-key: YOUR_ADMIN_API_KEY" "https://api.memoremi.com/admin/workspaces"
-   ```
-2. Install using the full URL with the workspace ID:
-   ```
-   https://api.memoremi.com/jira/atlassian-connect.json?workspaceId=<id>
-   ```
+**Fix:** Install using the descriptor URL with the real workspace ID from the bootstrap step above:
+```
+https://api.memoremi.com/jira/atlassian-connect.json?workspaceId=<workspace.id>
+```
 
-> **Note:** Atlassian is ending Connect app installs via descriptor URL on **March 31, 2026**.
+Paste that full URL into the Jira **Install a private app → App descriptor URL** field.
+
+> **Warning:** Atlassian ended Connect app installs via descriptor URL on **March 31, 2026**. This method only works for apps already installed before that date or in development mode. After that date, migration to Forge is required.
 
 ---
 

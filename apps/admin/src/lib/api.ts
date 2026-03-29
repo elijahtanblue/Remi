@@ -1,10 +1,9 @@
-const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
-const ADMIN_KEY = process.env.ADMIN_API_KEY ?? 'dev-admin-key';
-
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const apiUrl = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+  const adminKey = process.env.ADMIN_API_KEY ?? 'dev-admin-key';
+  const res = await fetch(`${apiUrl}${path}`, {
     ...options,
-    headers: { 'x-admin-key': ADMIN_KEY, 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'x-admin-key': adminKey, 'Content-Type': 'application/json', ...options?.headers },
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
