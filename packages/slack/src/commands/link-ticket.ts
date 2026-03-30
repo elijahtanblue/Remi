@@ -108,13 +108,25 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         ...(assigneeName ? { assigneeDisplayName: assigneeName } : {}),
       });
 
-      // 8. Check for existing link
+      // 8. Check for existing link — if already linked but an assignee was provided,
+      // update the assignee instead of rejecting.
       const existingLink = await findIssueThreadLink(prisma, issue.id, thread.id);
       if (existingLink) {
-        await respond({
-          response_type: 'ephemeral',
-          text: `Already linked *${issueKey}* to this ${isChannelLevel ? 'channel' : 'thread'}.`,
-        });
+        if (assigneeName) {
+          await prisma.issue.update({
+            where: { id: issue.id },
+            data: { assigneeDisplayName: assigneeName },
+          });
+          await respond({
+            response_type: 'ephemeral',
+            text: `Updated assignee for *${issueKey}* to *${assigneeName}*.`,
+          });
+        } else {
+          await respond({
+            response_type: 'ephemeral',
+            text: `Already linked *${issueKey}* to this ${isChannelLevel ? 'channel' : 'thread'}. To assign someone, use \`/link-ticket ${issueKey} @username\`.`,
+          });
+        }
         return;
       }
 
