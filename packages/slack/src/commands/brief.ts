@@ -55,10 +55,10 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
           const snapshot = await getLatestSnapshot(prisma, unit.id);
           if (snapshot) {
             const freshness = new Date(snapshot.freshness).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const keyDecisions = (snapshot.keyDecisions as string[]);
-            const openActions = (snapshot.openActions as Array<{ description: string; assignee?: string }>);
-            const blockers = (snapshot.blockers as string[]);
-            const openQuestions = (snapshot.openQuestions as string[]);
+            const keyDecisions = Array.isArray(snapshot.keyDecisions) ? (snapshot.keyDecisions as string[]) : [];
+            const openActions = Array.isArray(snapshot.openActions) ? (snapshot.openActions as Array<{ description: string; assignee?: string }>) : [];
+            const blockers = Array.isArray(snapshot.blockers) ? (snapshot.blockers as string[]) : [];
+            const openQuestions = Array.isArray(snapshot.openQuestions) ? (snapshot.openQuestions as string[]) : [];
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const blocks: any[] = [

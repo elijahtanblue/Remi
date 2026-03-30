@@ -80,6 +80,8 @@ export async function handleSlackEvent(
   // ── Memory ingestion trigger ──────────────────────────────────────────────
   const memoryConfig = await getMemoryConfig(prisma, message.workspaceId);
   if (memoryConfig?.enabled) {
+    // TODO: excludedChannelIds and excludedUserIds from memoryConfig are stored but not
+    // yet enforced here. Add checks before enqueuing if those exclusion features are activated.
     const threadLinks = await prisma.issueThreadLink.findMany({
       where: { threadId: thread.id, unlinkedAt: null },
       include: { issue: true },

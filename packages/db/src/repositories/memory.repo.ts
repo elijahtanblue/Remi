@@ -123,6 +123,11 @@ export async function createSnapshot(
     sourceObsIds: string[];
   },
 ) {
+  // NOTE: count+1 for version has a TOCTOU race if concurrent snapshot jobs run for the
+  // same memoryUnitId. Mitigation: ensure MEMORY_SNAPSHOT messages use the memoryUnitId
+  // as the idempotency key so only one job runs per unit at a time. A unique constraint
+  // on (memoryUnitId, version) would surface conflicts as retriable errors if this is later
+  // needed.
   const count = await prisma.memorySnapshot.count({ where: { memoryUnitId: data.memoryUnitId } });
   return prisma.memorySnapshot.create({
     data: {

@@ -45,12 +45,13 @@ startConsumer(queue, QueueNames.BACKFILL_JOBS, (msg) =>
 );
 
 startConsumer(queue, QueueNames.MEMORY_EXTRACT, (msg) =>
-  handleMemoryExtract(msg as MemoryExtractMessage),
+  handleMemoryExtract(msg as MemoryExtractMessage, queue),
 );
 startConsumer(queue, QueueNames.MEMORY_SNAPSHOT, (msg) =>
   handleMemorySnapshot(msg as MemorySnapshotMessage, queue),
 );
 startConsumer(queue, QueueNames.MEMORY_WRITEBACK_PROPOSE, (msg) =>
+  // Re-proposal requests from admin API only — not triggered automatically
   handleMemoryWritebackPropose(msg as MemoryWritebackProposeMessage, queue),
 );
 startConsumer(queue, QueueNames.MEMORY_WRITEBACK_APPLY, (msg) =>

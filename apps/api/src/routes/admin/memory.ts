@@ -78,11 +78,14 @@ export async function memoryRoutes(app: FastifyInstance, { queue }: { queue: IQu
 
       await updateProposalStatus(prisma, proposal.id, 'approved', { approvedBy: req.body.approvedBy });
 
+      const unit = await getMemoryUnit(prisma, proposal.memoryUnitId);
+      const workspaceId = unit?.workspaceId ?? '';
+
       const applyKey = uuidv4();
       await queue.send(QueueNames.MEMORY_WRITEBACK_APPLY, {
         id: applyKey,
         idempotencyKey: applyKey,
-        workspaceId: (proposal as any).memoryUnit?.workspaceId ?? '',
+        workspaceId,
         timestamp: new Date().toISOString(),
         type: 'memory_writeback_apply',
         payload: { proposalId: proposal.id },

@@ -1,8 +1,10 @@
 import { prisma, getProposal, updateProposalStatus, getMemoryUnit } from '@remi/db';
 import type { MemoryExtractMessage, MemorySnapshotMessage, MemoryWritebackProposeMessage, MemoryWritebackApplyMessage } from '@remi/shared';
+import { QueueNames } from '@remi/shared';
 import type { IQueueProducer } from '@remi/queue';
 import { createGeminiClient, createOpenAiClient, runExtraction, runSnapshot, applyWriteback, runStage3 } from '@remi/memory-engine';
 import { config } from '../config.js';
+import { v4 as uuidv4 } from 'uuid';
 
 function getClients() {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
@@ -14,7 +16,7 @@ function getClients() {
   };
 }
 
-export async function handleMemoryExtract(message: MemoryExtractMessage): Promise<void> {
+export async function handleMemoryExtract(message: MemoryExtractMessage, queue: IQueueProducer): Promise<void> {
   const { memoryUnitId, sourceId, sourceType } = message.payload;
 
   let messageText = '';
@@ -34,6 +36,17 @@ export async function handleMemoryExtract(message: MemoryExtractMessage): Promis
   await runExtraction(prisma, { memoryUnitId, sourceId, sourceType, messageText }, clients);
 
   console.log(`[memory-extract] Extracted observations for unit ${memoryUnitId} from ${sourceType} ${sourceId}`);
+
+  // Enqueue Stage 2 snapshot synthesis
+  const snapshotKey = uuidv4();
+  await queue.send(QueueNames.MEMORY_SNAPSHOT, {
+    id: snapshotKey,
+    idempotencyKey: `memory-snapshot-${memoryUnitId}`,
+    workspaceId: message.workspaceId,
+    timestamp: new Date().toISOString(),
+    type: 'memory_snapshot',
+    payload: { memoryUnitId },
+  });
 }
 
 export async function handleMemorySnapshot(
@@ -53,6 +66,9 @@ export async function handleMemorySnapshot(
   }
 }
 
+// NOTE: Stage 3 (proposal generation) is called inline by runSnapshot when proposeWriteback=true.
+// This handler is reserved for explicit re-proposal requests (e.g., admin "rerun" action).
+// No code currently enqueues MEMORY_WRITEBACK_PROPOSE automatically.
 export async function handleMemoryWritebackPropose(
   message: MemoryWritebackProposeMessage,
   _queue: IQueueProducer,
