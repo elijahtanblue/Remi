@@ -27,6 +27,9 @@ model Workspace {
   summaryRuns   SummaryRun[]
   auditLogs     AuditLog[]
   deadLetters   QueueDeadLetter[]
+  productEvents ProductEvent[]
+  memoryConfig  WorkspaceMemoryConfig?
+  memoryUnits   MemoryUnit[]
 
   @@map("workspaces")
 }
@@ -153,6 +156,7 @@ model Issue {
   threadLinks IssueThreadLink[]
   emailLinks  IssueEmailLink[]
   summaries   Summary[]
+  memoryUnits MemoryUnit[]
 
   @@unique([jiraIssueId, jiraSiteUrl])
   @@index([workspaceId])
@@ -285,6 +289,23 @@ model SummaryRun {
   @@map("summary_runs")
 }
 
+// ─── Product Analytics ───────────────────────────────────────────────────────
+
+model ProductEvent {
+  id          String   @id @default(cuid())
+  workspaceId String
+  event       String
+  actorId     String?
+  properties  Json?
+  occurredAt  DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, event, occurredAt])
+  @@index([event, occurredAt])
+  @@map("product_events")
+}
+
 // ─── Operational ─────────────────────────────────────────────────────────────
 
 model AuditLog {
@@ -395,4 +416,110 @@ model IssueEmailLink {
   @@index([issueId])
   @@index([threadId])
   @@map("issue_email_links")
+}
+
+// ─── Autonomous Memory ────────────────────────────────────────────────────────
+
+model WorkspaceMemoryConfig {
+  id                 String   @id @default(cuid())
+  workspaceId        String   @unique
+  enabled            Boolean  @default(false)
+  excludedChannelIds String[]
+  excludedUserIds    String[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@map("workspace_memory_configs")
+}
+
+model MemoryUnit {
+  id          String   @id @default(cuid())
+  workspaceId String
+  scopeType   String   // 'issue_thread' | 'app_dm'
+  scopeRef    String   // threadId for issue_thread, slackUserId for app_dm
+  issueId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace    Workspace                @relation(fields: [workspaceId], references: [id])
+  issue        Issue?                   @relation(fields: [issueId], references: [id])
+  observations MemoryObservation[]
+  snapshots    MemorySnapshot[]
+  proposals    MemoryWritebackProposal[]
+
+  @@unique([workspaceId, scopeType, scopeRef])
+  @@index([workspaceId])
+  @@index([issueId])
+  @@map("memory_units")
+}
+
+model MemoryObservation {
+  id            String   @id @default(cuid())
+  memoryUnitId  String
+  category      String   // 'decision'|'action_item'|'blocker'|'open_question'|'status_update'|'owner_update'|'risk'
+  content       String
+  confidence    Float
+  citationIds   String[]
+  modelId       String
+  promptVersion String
+  extractedAt   DateTime @default(now())
+
+  memoryUnit MemoryUnit @relation(fields: [memoryUnitId], references: [id])
+
+  @@index([memoryUnitId, extractedAt])
+  @@map("memory_observations")
+}
+
+model MemorySnapshot {
+  id            String   @id @default(cuid())
+  memoryUnitId  String
+  version       Int
+  headline      String
+  currentState  String
+  keyDecisions  Json
+  openActions   Json
+  blockers      Json
+  openQuestions Json
+  owners        String[]
+  confidence    Float
+  freshness     DateTime
+  modelId       String
+  promptVersion String
+  sourceObsIds  String[]
+  createdAt     DateTime @default(now())
+
+  memoryUnit MemoryUnit               @relation(fields: [memoryUnitId], references: [id])
+  proposals  MemoryWritebackProposal[]
+
+  @@index([memoryUnitId, version])
+  @@map("memory_snapshots")
+}
+
+model MemoryWritebackProposal {
+  id            String    @id @default(cuid())
+  memoryUnitId  String
+  snapshotId    String
+  target        String    // 'jira_comment'
+  status        String    @default("draft") // 'draft'|'pending_approval'|'approved'|'applied'|'rejected'|'failed'
+  payload       Json      // { jiraIssueKey: string; commentBody: string }
+  citationIds   String[]
+  confidence    Float
+  modelId       String
+  promptVersion String
+  approvedBy    String?
+  approvedAt    DateTime?
+  appliedAt     DateTime?
+  rejectedAt    DateTime?
+  failureReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  memoryUnit MemoryUnit     @relation(fields: [memoryUnitId], references: [id])
+  snapshot   MemorySnapshot @relation(fields: [snapshotId], references: [id])
+
+  @@index([memoryUnitId])
+  @@index([status])
+  @@map("memory_writeback_proposals")
 }
