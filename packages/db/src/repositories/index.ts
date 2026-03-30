@@ -8,3 +8,5 @@ export * from './summary.repo.js';
 export * from './audit-log.repo.js';
 export * from './dead-letter.repo.js';
 export * from './gmail.repo.js';
+export * from './product-event.repo.js';
+export * from './memory.repo.js';
