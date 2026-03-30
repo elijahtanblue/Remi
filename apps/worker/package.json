@@ -14,6 +14,7 @@
     "@remi/db": "workspace:*",
     "@remi/gmail": "workspace:*",
     "@remi/jira": "workspace:*",
+    "@remi/memory-engine": "workspace:*",
     "@remi/queue": "workspace:*",
     "@remi/shared": "workspace:*",
     "@remi/summary-engine": "workspace:*",
