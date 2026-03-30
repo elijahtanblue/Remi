@@ -13,7 +13,12 @@ dist/
 .local-storage/
 coverage/
 .prisma/
-AI_decisions.md
+AI_DECISIONS.md
 .claude/settings.local.json
 .claude/settings.json
 settings.local.json
+.pem keys/
+*gcp-keys.json
+!.env.example
+.pem keys/gcp-keys.json
+apps/admin/public

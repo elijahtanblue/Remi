@@ -11,7 +11,7 @@ export function registerAppHome(app: App): void {
         workspaceId,
         event: 'app_home_opened',
         actorId: userId,
-      });
+      }).catch((err) => logger.warn({ err, workspaceId, userId }, 'Failed to record product event'));
 
       // Query last 10 active IssueThreadLinks for this workspace, including issue data
       const recentLinks = await prisma.issueThreadLink.findMany({

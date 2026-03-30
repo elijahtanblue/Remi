@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Remi AI Cost Model</title>
+  <style>
+    :root{--bg:#f6f0e6;--card:#fffdf8;--line:#dccdb7;--ink:#211b15;--muted:#6d6459;--accent:#b45309;--good:#166534}
+    *{box-sizing:border-box} body{margin:0;font-family:Georgia,"Times New Roman",serif;background:radial-gradient(circle at top left,rgba(245,158,11,.14),transparent 32%),var(--bg);color:var(--ink)}
+    main{width:min(1280px,calc(100vw - 32px));margin:28px auto 40px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 36px rgba(56,35,10,.08)}
+    .hero,.panel{padding:22px}
+    .hero{margin-bottom:18px}
+    h1,h2{margin:0;letter-spacing:-.02em} h1{font-size:clamp(2rem,3vw,3rem)} h2{font-size:1.2rem;margin-bottom:14px}
+    p{margin:0;line-height:1.55} .sub{margin-top:12px;color:var(--muted);max-width:76ch}
+    .row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+    .chip,.preset{padding:8px 14px;border-radius:999px;border:1px solid rgba(180,83,9,.22);background:rgba(245,158,11,.1);color:var(--accent);font-size:.94rem}
+    .preset{cursor:pointer}
+    .layout{display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:18px;align-items:start}
+    .controls{position:sticky;top:16px}
+    .grid{display:grid;gap:12px}
+    .control{border:1px solid var(--line);border-radius:16px;padding:12px;background:linear-gradient(180deg,rgba(255,247,230,.66),rgba(255,255,255,.84))}
+    .head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:8px}
+    .value{color:var(--accent);font-variant-numeric:tabular-nums}
+    .hint{margin-top:6px;color:var(--muted);font-size:.85rem}
+    input[type="range"]{width:100%;accent-color:#f59e0b}
+    .metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .metric{padding:18px}
+    .kicker{font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .big{margin-top:10px;font-size:clamp(1.8rem,2.6vw,2.6rem);font-variant-numeric:tabular-nums}
+    .meta{margin-top:8px;color:var(--muted);font-size:.92rem}
+    .wrap{overflow:auto;border:1px solid var(--line);border-radius:16px}
+    table{width:100%;border-collapse:collapse;min-width:720px}
+    th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+    th{background:#fff6e8;font-size:.86rem;text-transform:uppercase;letter-spacing:.06em}
+    tr:last-child td{border-bottom:0}
+    .notes{display:grid;gap:10px;color:var(--muted)} .notes strong{color:var(--ink)} .good{color:var(--good)}
+    @media (max-width:980px){.layout{grid-template-columns:1fr}.controls{position:static}.metrics{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card hero">
+      <h1>Remi AI Cost Model</h1>
+      <p class="sub">This is a spreadsheet-style calculator for pricing Remi per Slack workspace, not per seat. The defaults are tuned to a more realistic v1 shape: bounded rolling digests, opt-in visibility instead of whole-workspace ingestion, and a cheaper default summary model with the frontier model reserved for escalations.</p>
+      <div class="row">
+        <div class="chip">Prices checked March 30, 2026</div>
+        <div class="chip">Workspace-first model</div>
+        <div class="chip">Digest context assumed bounded</div>
+        <div class="chip">OpenAI-only is cost-competitive</div>
+      </div>
+      <div class="row">
+        <button class="preset" type="button" data-preset="threadV1">Thread-Centric V1</button>
+        <button class="preset" type="button" data-preset="broadIngestion">Broad Ingestion</button>
+        <button class="preset" type="button" data-preset="powerUser">Power User</button>
+      </div>
+    </section>
+
+    <section class="layout">
+      <aside class="card panel controls">
+        <h2>Inputs</h2>
+        <div id="controls" class="grid"></div>
+      </aside>
+
+      <div class="grid">
+        <section class="card panel">
+          <h2>Derived Monthly Volumes</h2>
+          <div class="metrics">
+            <article class="card metric">
+              <div class="kicker">Raw Workspace Messages</div>
+              <div class="big" id="rawMessagesValue"></div>
+              <div class="meta">All human Slack messages before Remi scope and heuristics.</div>
+            </article>
+            <article class="card metric">
+              <div class="kicker">AI-Processed Messages</div>
+              <div class="big" id="aiMessagesValue"></div>
+              <div class="meta">Messages that survive permissions and lightweight filtering.</div>
+            </article>
+            <article class="card metric">
+              <div class="kicker">Rolling Digests</div>
+              <div class="big" id="digestsValue"></div>
+              <div class="meta">Digest count stays healthy when it is event-driven instead of every message.</div>
+            </article>
+            <article class="card metric">
+              <div class="kicker">/brief Requests</div>
+              <div class="big" id="briefsValue"></div>
+              <div class="meta">One of the biggest cost levers worth tracking in product analytics.</div>
+            </article>
+          </div>
+        </section>
+
+        <section class="card panel">
+          <h2>Per-Workspace AI Cost</h2>
+          <div class="wrap">
+            <table>
+              <thead>
+                <tr><th>Stage</th><th>Volume</th><th>Hybrid</th><th>OpenAI-only</th></tr>
+              </thead>
+              <tbody id="stageTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card panel">
+          <h2>Scale Table</h2>
+          <div class="wrap">
+            <table>
+              <thead>
+                <tr><th>Workspaces</th><th>Revenue / mo</th><th>Hybrid AI / mo</th><th>OpenAI AI / mo</th><th>Infra / mo</th><th>Hybrid Margin</th><th>OpenAI Margin</th></tr>
+              </thead>
+              <tbody id="scaleTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card panel">
+          <h2>What I Adjusted</h2>
+          <div class="notes">
+            <p><strong>Keep the billing unit as workspace.</strong> That is the economically relevant unit for your current go-to-market, not seats.</p>
+            <p><strong>Split "pre-filter" into visibility and AI-worthiness.</strong> Permissions and product scope are not the same thing as cheap heuristics.</p>
+            <p><strong>Do not model digest context growing forever.</strong> If a 6-month-old thread keeps feeding larger and larger prompts, the architecture needs a bounded summary state.</p>
+            <p><strong>Use the cheaper summary model by default.</strong> Current pricing makes <code>gpt-5-mini</code> the more realistic everyday summary path, with <code>gpt-5</code> reserved for escalations.</p>
+            <p><strong>AI cost is usually not the thing that breaks the model.</strong> The flat-fee enterprise account with a huge workspace is still the risk case.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script>
+    const PRICING = {
+      hybrid: {
+        classify: { model: "Gemini 2.5 Flash-Lite", input: 0.10, output: 0.40 },
+        digest: { model: "Gemini 2.5 Flash", input: 0.15, output: 1.25 },
+        brief: { model: "GPT-5 mini", input: 0.25, output: 2.00 },
+        escalation: { model: "GPT-5", input: 1.25, output: 10.00 }
+      },
+      openai: {
+        classify: { model: "GPT-5 nano", input: 0.05, output: 0.40 },
+        digest: { model: "GPT-5 mini", input: 0.25, output: 2.00 },
+        brief: { model: "GPT-5 mini", input: 0.25, output: 2.00 },
+        escalation: { model: "GPT-5", input: 1.25, output: 10.00 }
+      }
+    };
+
+    const SCALE_POINTS = [10, 100, 1000, 10000];
+
+    const CONTROL_CONFIG = [
+      { id: "teamSize", label: "Seats per workspace", min: 5, max: 500, step: 1, value: 20, hint: "Seats sold into the account, not just daily active posters." },
+      { id: "activePosterPct", label: "Active poster share", min: 10, max: 100, step: 1, value: 65, hint: "More realistic than assuming every seat posts daily.", format: "pct" },
+      { id: "messagesPerPosterPerDay", label: "Messages per active poster per day", min: 5, max: 80, step: 1, value: 25, hint: "Total message volume before Remi filters anything." },
+      { id: "workingDays", label: "Working days per month", min: 15, max: 31, step: 1, value: 22, hint: "Used for both message volume and regular /brief usage." },
+      { id: "visibleSharePct", label: "Remi-visible share of workspace messages", min: 5, max: 100, step: 1, value: 25, hint: "Permissions and ingestion scope, not heuristics.", format: "pct" },
+      { id: "aiWorthySharePct", label: "AI-worthy share of visible messages", min: 10, max: 100, step: 1, value: 60, hint: "Messages worth semantic extraction after cheap filtering.", format: "pct" },
+      { id: "digestEveryMessages", label: "Rolling digest trigger", min: 10, max: 100, step: 1, value: 40, hint: "Lower values improve freshness but drive more summarization churn." },
+      { id: "briefsPerWorkingDay", label: "/brief requests per working day", min: 0, max: 10, step: 0.25, value: 1, hint: "Two per day is already a power-usage workspace.", format: "float2" },
+      { id: "escalationRatePct", label: "Escalation rate", min: 0, max: 30, step: 1, value: 8, hint: "Early v1s often land above 5% before prompts stabilize.", format: "pct" },
+      { id: "classifyInputTokens", label: "Classify input tokens per call", min: 50, max: 1000, step: 10, value: 250, hint: "Message text, metadata, instructions, and schema overhead." },
+      { id: "classifyOutputTokens", label: "Classify output tokens per call", min: 10, max: 300, step: 10, value: 80, hint: "Structured labels plus extracted signals." },
+      { id: "digestInputTokens", label: "Digest input tokens per call", min: 500, max: 8000, step: 100, value: 1800, hint: "This should stay bounded by design." },
+      { id: "digestOutputTokens", label: "Digest output tokens per call", min: 100, max: 2000, step: 50, value: 350, hint: "Short rolling memory, not a polished user-facing summary." },
+      { id: "briefInputTokens", label: "/brief input tokens per call", min: 500, max: 12000, step: 100, value: 3500, hint: "Bounded digest state plus latest deltas and issue metadata." },
+      { id: "briefOutputTokens", label: "/brief output tokens per call", min: 100, max: 2500, step: 50, value: 700, hint: "This is where product verbosity shows up in cost." },
+      { id: "escalationInputTokens", label: "Escalation input tokens per call", min: 1000, max: 20000, step: 500, value: 8000, hint: "Long-tail cases that need the frontier model." },
+      { id: "escalationOutputTokens", label: "Escalation output tokens per call", min: 200, max: 4000, step: 100, value: 1200, hint: "Keep this tighter than you think or the expensive path fattens." },
+      { id: "pricePerWorkspace", label: "Price per workspace per month", min: 19, max: 499, step: 1, value: 99, hint: "Used for the margin view.", format: "usd" },
+      { id: "fixedInfraPerMonth", label: "Fixed infra per month", min: 0, max: 5000, step: 10, value: 150, hint: "A rough placeholder for RDS, queues, workers, and storage.", format: "usd" },
+      { id: "variableInfraPerWorkspace", label: "Variable infra per workspace per month", min: 0, max: 5, step: 0.05, value: 0.35, hint: "Practical margin math without pretending infra scales perfectly.", format: "usd" }
+    ];
+
+    const PRESETS = {
+      threadV1: { teamSize: 20, activePosterPct: 65, messagesPerPosterPerDay: 25, workingDays: 22, visibleSharePct: 25, aiWorthySharePct: 60, digestEveryMessages: 40, briefsPerWorkingDay: 1, escalationRatePct: 8, classifyInputTokens: 250, classifyOutputTokens: 80, digestInputTokens: 1800, digestOutputTokens: 350, briefInputTokens: 3500, briefOutputTokens: 700, escalationInputTokens: 8000, escalationOutputTokens: 1200, pricePerWorkspace: 99, fixedInfraPerMonth: 150, variableInfraPerWorkspace: 0.35 },
+      broadIngestion: { teamSize: 20, activePosterPct: 100, messagesPerPosterPerDay: 30, workingDays: 22, visibleSharePct: 100, aiWorthySharePct: 35, digestEveryMessages: 25, briefsPerWorkingDay: 2, escalationRatePct: 5, classifyInputTokens: 250, classifyOutputTokens: 80, digestInputTokens: 2000, digestOutputTokens: 400, briefInputTokens: 3500, briefOutputTokens: 700, escalationInputTokens: 8000, escalationOutputTokens: 1200, pricePerWorkspace: 99, fixedInfraPerMonth: 150, variableInfraPerWorkspace: 0.35 },
+      powerUser: { teamSize: 35, activePosterPct: 75, messagesPerPosterPerDay: 30, workingDays: 22, visibleSharePct: 45, aiWorthySharePct: 65, digestEveryMessages: 30, briefsPerWorkingDay: 2.5, escalationRatePct: 10, classifyInputTokens: 280, classifyOutputTokens: 90, digestInputTokens: 2200, digestOutputTokens: 450, briefInputTokens: 4200, briefOutputTokens: 850, escalationInputTokens: 10000, escalationOutputTokens: 1400, pricePerWorkspace: 149, fixedInfraPerMonth: 200, variableInfraPerWorkspace: 0.45 }
+    };
+
+    const controlsRoot = document.getElementById("controls");
+    controlsRoot.innerHTML = CONTROL_CONFIG.map((cfg) => `
+      <div class="control">
+        <div class="head">
+          <label for="${cfg.id}">${cfg.label}</label>
+          <div class="value" data-out="${cfg.id}"></div>
+        </div>
+        <input id="${cfg.id}" type="range" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}" value="${cfg.value}" />
+        <div class="hint">${cfg.hint}</div>
+      </div>
+    `).join("");
+
+    function currency(value) {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: value >= 100 ? 0 : 2, maximumFractionDigits: value >= 100 ? 0 : 2 }).format(value);
+    }
+
+    function number(value, digits = 0) {
+      return new Intl.NumberFormat("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+    }
+
+    function formatValue(value, format) {
+      if (format === "pct") return `${number(value, 0)}%`;
+      if (format === "float2") return number(value, 2);
+      if (format === "usd") return currency(value);
+      return number(value, 0);
+    }
+
+    function getValues() {
+      return Object.fromEntries(CONTROL_CONFIG.map((cfg) => [cfg.id, Number(document.getElementById(cfg.id).value)]));
+    }
+
+    function stageCost(volume, inputTokens, outputTokens, price) {
+      return (volume * inputTokens * price.input) / 1_000_000 + (volume * outputTokens * price.output) / 1_000_000;
+    }
+
+    function compute(values) {
+      const rawMessages = values.teamSize * (values.activePosterPct / 100) * values.messagesPerPosterPerDay * values.workingDays;
+      const visibleMessages = rawMessages * (values.visibleSharePct / 100);
+      const aiMessages = visibleMessages * (values.aiWorthySharePct / 100);
+      const digests = aiMessages / values.digestEveryMessages;
+      const briefs = values.briefsPerWorkingDay * values.workingDays;
+      const escalations = briefs * (values.escalationRatePct / 100);
+      const hybrid = {
+        classify: stageCost(aiMessages, values.classifyInputTokens, values.classifyOutputTokens, PRICING.hybrid.classify),
+        digest: stageCost(digests, values.digestInputTokens, values.digestOutputTokens, PRICING.hybrid.digest),
+        brief: stageCost(briefs, values.briefInputTokens, values.briefOutputTokens, PRICING.hybrid.brief),
+        escalation: stageCost(escalations, values.escalationInputTokens, values.escalationOutputTokens, PRICING.hybrid.escalation)
+      };
+      const openai = {
+        classify: stageCost(aiMessages, values.classifyInputTokens, values.classifyOutputTokens, PRICING.openai.classify),
+        digest: stageCost(digests, values.digestInputTokens, values.digestOutputTokens, PRICING.openai.digest),
+        brief: stageCost(briefs, values.briefInputTokens, values.briefOutputTokens, PRICING.openai.brief),
+        escalation: stageCost(escalations, values.escalationInputTokens, values.escalationOutputTokens, PRICING.openai.escalation)
+      };
+      return {
+        rawMessages,
+        aiMessages,
+        digests,
+        briefs,
+        escalations,
+        hybrid,
+        openai,
+        hybridTotal: Object.values(hybrid).reduce((sum, value) => sum + value, 0),
+        openaiTotal: Object.values(openai).reduce((sum, value) => sum + value, 0)
+      };
+    }
+
+    function render() {
+      const values = getValues();
+      const result = compute(values);
+
+      for (const cfg of CONTROL_CONFIG) {
+        document.querySelector(`[data-out="${cfg.id}"]`).textContent = formatValue(values[cfg.id], cfg.format);
+      }
+
+      document.getElementById("rawMessagesValue").textContent = number(result.rawMessages, 0);
+      document.getElementById("aiMessagesValue").textContent = number(result.aiMessages, 0);
+      document.getElementById("digestsValue").textContent = number(result.digests, 1);
+      document.getElementById("briefsValue").textContent = number(result.briefs, 1);
+
+      const stageRows = [
+        { label: "Classify + extract", volume: `${number(result.aiMessages, 0)} calls`, hybrid: `${currency(result.hybrid.classify)} | ${PRICING.hybrid.classify.model}`, openai: `${currency(result.openai.classify)} | ${PRICING.openai.classify.model}` },
+        { label: "Rolling digest", volume: `${number(result.digests, 1)} calls`, hybrid: `${currency(result.hybrid.digest)} | ${PRICING.hybrid.digest.model}`, openai: `${currency(result.openai.digest)} | ${PRICING.openai.digest.model}` },
+        { label: "/brief final summary", volume: `${number(result.briefs, 1)} calls`, hybrid: `${currency(result.hybrid.brief)} | ${PRICING.hybrid.brief.model}`, openai: `${currency(result.openai.brief)} | ${PRICING.openai.brief.model}` },
+        { label: "Escalation", volume: `${number(result.escalations, 1)} calls`, hybrid: `${currency(result.hybrid.escalation)} | ${PRICING.hybrid.escalation.model}`, openai: `${currency(result.openai.escalation)} | ${PRICING.openai.escalation.model}` },
+        { label: "Total", volume: "Per workspace / month", hybrid: `${currency(result.hybridTotal)} | ${number((result.hybridTotal / values.pricePerWorkspace) * 100, 2)}% of revenue`, openai: `${currency(result.openaiTotal)} | ${number((result.openaiTotal / values.pricePerWorkspace) * 100, 2)}% of revenue` }
+      ];
+      document.getElementById("stageTableBody").innerHTML = stageRows.map((row) => `<tr><td>${row.label}</td><td>${row.volume}</td><td>${row.hybrid}</td><td>${row.openai}</td></tr>`).join("");
+
+      document.getElementById("scaleTableBody").innerHTML = SCALE_POINTS.map((workspaces) => {
+        const revenue = workspaces * values.pricePerWorkspace;
+        const hybridAi = workspaces * result.hybridTotal;
+        const openaiAi = workspaces * result.openaiTotal;
+        const infra = values.fixedInfraPerMonth + workspaces * values.variableInfraPerWorkspace;
+        const hybridMargin = ((revenue - hybridAi - infra) / revenue) * 100;
+        const openaiMargin = ((revenue - openaiAi - infra) / revenue) * 100;
+        return `<tr><td>${number(workspaces, 0)}</td><td>${currency(revenue)}</td><td>${currency(hybridAi)}</td><td>${currency(openaiAi)}</td><td>${currency(infra)}</td><td class="good">${number(hybridMargin, 2)}%</td><td class="good">${number(openaiMargin, 2)}%</td></tr>`;
+      }).join("");
+    }
+
+    function applyPreset(name) {
+      const preset = PRESETS[name];
+      if (!preset) return;
+      Object.entries(preset).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+      });
+      render();
+    }
+
+    CONTROL_CONFIG.forEach((cfg) => document.getElementById(cfg.id).addEventListener("input", render));
+    document.querySelectorAll("[data-preset]").forEach((button) => button.addEventListener("click", () => applyPreset(button.dataset.preset)));
+    applyPreset("threadV1");
+  </script>
+</body>
+</html>

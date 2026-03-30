@@ -621,7 +621,159 @@ Remi will automatically create a workspace for your Jira site. You can link it t
 
 ---
 
-### Step 14: Set up memoremi.com with HTTPS
+### Step 14: Enable Gmail integration (optional)
+
+Remi can monitor specific Google Workspace email addresses (e.g. `support@yourcompany.com`) and automatically detect when emails reference Jira issue keys. When detected, Remi sends the installer a Slack DM suggesting they link the email thread to the issue.
+
+This feature requires a **Google Workspace** domain (not personal Gmail accounts). It uses a service account with domain-wide delegation to read emails on behalf of your monitored addresses.
+
+---
+
+#### A. Create a Google Cloud project and enable the Gmail API
+
+> **Your web browser → [console.cloud.google.com](https://console.cloud.google.com)**
+
+1. Click the project dropdown at the top → **New Project**
+   - Name: `remi-gmail` (or anything you like)
+   - Click **Create**
+2. Make sure the new project is selected in the dropdown
+3. Go to **APIs & Services → Library**
+4. Search for **Gmail API** → click it → click **Enable**
+5. Enable organisational policy admin for first creation use link to deploy <https://www.reddit.com/r/gsuite/comments/1dqv9hj/super_admin_cant_give_iam_organizational_policy/>
+
+---
+
+#### B. Create a service account
+
+> **Google Cloud Console → APIs & Services → Credentials**
+
+1. Click **+ Create Credentials** → **application data**
+2. Service account name: `remi-gmail-reader`
+3. Click **Create and Continue** → skip the optional role/access steps → click **Done**
+4. Click the service account you just created in the list
+5. Go to the **Keys** tab → **Add Key** → **Create new key** → choose **JSON** → click **Create**
+   - A JSON file downloads automatically — **keep this safe**, you'll paste its contents into the configure API call below
+
+---
+
+#### C. Enable domain-wide delegation
+
+Still on the service account detail page:
+
+1. Click the **Details** tab
+2. Under **Advanced settings**, find **Domain-wide delegation** and click **Edit** (or **Show domain-wide delegation**)
+3. Go to Step D for now
+4. Click **Save**
+5. Note the **Client ID** shown (a long number) — you need it in the next step
+
+---
+
+#### D. Authorise the service account in Google Workspace Admin Console
+
+> **Your web browser → [admin.google.com](https://admin.google.com)** (requires Google Workspace super admin access)
+
+1. Go to **Security → Access and data control → API controls**
+2. Click **Manage Domain Wide Delegation**
+3. Click **Add new**
+4. Paste the **Client ID** from Step C
+5. Under **OAuth scopes**, add exactly:
+   ```
+   https://www.googleapis.com/auth/gmail.readonly
+   ```
+6. Click **Authorise**
+
+This grants Remi read-only access to impersonate the email addresses you configure in Step E.
+
+---
+
+#### E. Configure Remi via the admin API
+
+> **Your computer's terminal**
+
+Replace the placeholder values:
+- `YOUR_ADMIN_API_KEY` — from your `ADMIN_API_KEY` env var
+- `YOUR_WORKSPACE_ID` — the workspace ID from the admin dashboard Workspaces page
+- The service account JSON — paste the full contents of the JSON file downloaded in Step B (minified to one line, or use `$(cat service-account.json)`)
+
+```bash
+curl -X POST https://api.memoremi.com/admin/gmail/configure \
+  -H "Content-Type: application/json" \
+  -H "x-admin-key: YOUR_ADMIN_API_KEY" \
+  -d '{
+    "workspaceId": "YOUR_WORKSPACE_ID",
+    "serviceAccountJson": "{\"type\":\"service_account\",\"client_email\":\"remi-gmail-reader@your-project.iam.gserviceaccount.com\",\"private_key\":\"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n\",...}",
+    "domain": "yourcompany.com",
+    "monitoredEmails": [
+      "support@yourcompany.com",
+      "ops@yourcompany.com"
+    ]
+  }'
+```
+
+Or using the file directly:
+
+```bash
+curl -X POST https://api.memoremi.com/admin/gmail/configure \
+  -H "Content-Type: application/json" \
+  -H "x-admin-key: YOUR_ADMIN_API_KEY" \
+  -d "{
+    \"workspaceId\": \"YOUR_WORKSPACE_ID\",
+    \"serviceAccountJson\": $(cat service-account.json | jq -c . | jq -Rs .),
+    \"domain\": \"yourcompany.com\",
+    \"monitoredEmails\": [\"support@yourcompany.com\", \"ops@yourcompany.com\"]
+  }"
+```
+
+A successful response looks like:
+
+```json
+{ "ok": true, "install": { "id": "...", "workspaceId": "...", "domain": "yourcompany.com", "monitoredEmails": [...] } }
+```
+
+---
+
+#### F. Enable Gmail sync in your environment
+
+Add to your `.env.prod` on the server and restart:
+
+```bash
+GMAIL_SYNC_ENABLED=true
+```
+
+```bash
+# Server terminal
+cd ~/remi
+nano ~/.env.prod   # add the line above
+cp ~/.env.prod .env.prod
+docker compose -f docker-compose.prod.yml up -d
+```
+
+The worker will now poll each monitored mailbox on its scheduled interval and send Slack DMs when emails mention Jira issue keys.
+
+---
+
+#### How Gmail sync works
+
+- **Incremental sync**: Remi uses Gmail's `historyId` to fetch only new messages since the last run. On the first sync (or when the historyId expires), it falls back to scanning the last 7 days.
+- **Issue key detection**: Remi scans subject lines and email bodies for patterns like `KAN-1`, `PROJ-123`, etc.
+- **Slack notification**: When an issue key is detected in an email, Remi sends a DM to the workspace installer with a suggestion to link the email thread.
+- **Read-only**: The service account only has `gmail.readonly` scope — Remi never sends, modifies, or deletes emails.
+
+---
+
+#### Verify the setup
+
+```bash
+# Check Gmail install is configured
+curl https://api.memoremi.com/admin/gmail/YOUR_WORKSPACE_ID \
+  -H "x-admin-key: YOUR_ADMIN_API_KEY"
+```
+
+You should see the domain and monitored emails returned (service account JSON is intentionally omitted from the response for security).
+
+---
+
+### Step 15: Set up memoremi.com with HTTPS
 
 This step connects your domain (`memoremi.com`) to your EC2 server and enables HTTPS via Caddy (free, automatic certificates).
 
@@ -710,7 +862,7 @@ The admin app (`apps/admin`) includes a `vercel.json` and can be deployed to Ver
 
 ---
 
-### (Optional) Step 15: Auto-deploy when you push code
+### (Optional) Step 16: Auto-deploy when you push code
 
 GitHub Actions builds your Docker images and deploys them to EC2 automatically on every push to `main`. The workflow file is already in the repo at [.github/workflows/deploy.yml](.github/workflows/deploy.yml). You just need to add secrets.
 
@@ -755,6 +907,7 @@ packages/
   storage/        Storage abstraction (S3 in prod, local files in dev)
   slack/          Slack Bolt handlers, commands, views
   jira/           Jira Connect auth, REST client, webhook parser, panel
+  gmail/          Gmail sync client, issue key detection, Slack DM notifications
   summary-engine/ Deterministic summary generation (no LLM)
 ```
 
@@ -837,12 +990,18 @@ SLACK_SOCKET_MODE=false
 
 # ─── API ────────────────────────────────────────────────────────────────────
 PORT=3000
-BASE_URL=https://api.memoremi.com
+BASE_URL=https://<insert api & domain>.com
 ADMIN_API_KEY=<64-char random string>
 
 # ─── Admin dashboard ────────────────────────────────────────────────────────
-NEXT_PUBLIC_API_URL=https://api.memoremi.com
+NEXT_PUBLIC_API_URL=https://<insert api & domain>.com
 ADMIN_API_KEY=<same as above>
+
+# ─── Gmail integration (optional) ───────────────────────────────────────────
+# Set to true to enable the Gmail sync worker.
+# The service account, domain, and monitored emails are stored in the database
+# via POST /admin/gmail/configure — no additional env vars needed beyond this flag.
+GMAIL_SYNC_ENABLED=true
 ```
 
 ---
@@ -850,7 +1009,7 @@ ADMIN_API_KEY=<same as above>
 ## Future integrations
 
 The connector architecture (Workspace → `*Install`) is designed to extend to:
-- Gmail / Outlook (email connectors)
+- Outlook (email connector — Gmail is already implemented)
 - Confluence / Notion (docs)
 - Linear, GitHub Issues
 - LLM-based summary rewriting (drop-in replacement for `packages/summary-engine`)

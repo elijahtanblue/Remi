@@ -29,4 +29,8 @@ export const api = {
     apiFetch<{ logs: any[] }>(
       `/admin/workspaces/${workspaceId}/audit-log?limit=${params?.limit ?? 50}&offset=${params?.offset ?? 0}&action=${params?.action ?? ''}`
     ),
+  getAnalytics: (params?: { since?: number; workspaceId?: string }) =>
+    apiFetch<{ since: string; sinceDays: number; workspaceId: string | null; counts: Array<{ event: string; count: number }> }>(
+      `/admin/analytics?since=${params?.since ?? 30}&workspaceId=${params?.workspaceId ?? ''}`
+    ),
 };

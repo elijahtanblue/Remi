@@ -20,6 +20,7 @@ Remi is your team's operational memory. It links Slack threads to Jira issues, t
 5. Any new messages in the thread or changes to the Jira issue automatically regenerate the summary
 6. Summaries surface in `/brief` in Slack, the Slack App Home, and a panel in the Jira issue sidebar
 7. Summaries are deterministic — no LLM, no API cost, fully auditable
+8. **Gmail (optional):** Remi monitors configured Google Workspace mailboxes and sends a Slack DM when an email references a Jira issue key, making it easy to link email threads to issues
 
 ---
 
@@ -130,6 +131,35 @@ You can also link a thread using the Slack message shortcut (no typing required)
 
 ---
 
+## Gmail integration
+
+Remi can monitor Google Workspace email addresses (e.g. `support@yourcompany.com`) and detect when emails reference Jira issue keys. When found, Remi sends the workspace installer a Slack DM suggesting they link the email thread.
+
+**What you need:**
+- A Google Workspace domain (not personal Gmail)
+- A Google service account with domain-wide delegation
+- `gmail.readonly` scope granted in Google Workspace Admin Console
+
+**Quick setup:**
+
+```bash
+curl -X POST https://api.memoremi.com/admin/gmail/configure \
+  -H "Content-Type: application/json" \
+  -H "x-admin-key: YOUR_ADMIN_KEY" \
+  -d '{
+    "workspaceId": "YOUR_WORKSPACE_ID",
+    "serviceAccountJson": "<contents of service account JSON>",
+    "domain": "yourcompany.com",
+    "monitoredEmails": ["support@yourcompany.com"]
+  }'
+```
+
+Then set `GMAIL_SYNC_ENABLED=true` in your environment and restart the worker.
+
+See [SETUP.md — Step 14](SETUP.md#step-14-enable-gmail-integration-optional) for the full step-by-step guide including Google Cloud Console and Workspace Admin setup.
+
+---
+
 ## Admin dashboard
 
 The admin dashboard at [admin.memoremi.com](https://admin.memoremi.com) is for operators, not end users. It shows:
@@ -138,6 +168,8 @@ The admin dashboard at [admin.memoremi.com](https://admin.memoremi.com) is for o
 - **Summaries** — full summary history with completeness scores and a re-run button
 - **Dead Letters** — failed jobs that need attention, with a retry button
 - **Audit Log** — complete record of every action Remi has taken
+- **Analytics** — feature usage counts (link_ticket_used, brief_viewed, etc.) across all workspaces
+- **Integrations** — configure Gmail for a workspace
 
 Access requires the `ADMIN_API_KEY` set in your environment.
 
@@ -173,6 +205,7 @@ packages/
   storage/        Storage abstraction (S3 in prod, local files in dev)
   slack/          Slack Bolt handlers, commands, views, OAuth
   jira/           Jira Connect auth, REST client, webhook parser, panel
+  gmail/          Gmail sync client, issue key detection, Slack DM notifications
   summary-engine/ Deterministic summary generation
 ```
 
@@ -181,7 +214,7 @@ packages/
 ## Future integrations
 
 The connector architecture (Workspace → `*Install`) is designed to extend to:
-- Gmail / Outlook (email connectors)
+- Outlook (email connector — Gmail is already implemented)
 - Confluence / Notion (docs)
 - Linear, GitHub Issues
 - LLM-based summary rewriting (drop-in replacement for `packages/summary-engine`)

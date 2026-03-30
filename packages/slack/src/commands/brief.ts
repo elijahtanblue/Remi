@@ -83,7 +83,12 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
               blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*Open Questions*\n${openQuestions.map(q => `❓ ${q}`).join('\n')}` } });
             }
 
-            void createProductEvent(prisma, { workspaceId, event: 'memory_brief_viewed', actorId: command.user_id, properties: { issueKey } });
+            void createProductEvent(prisma, {
+              workspaceId,
+              event: 'memory_brief_viewed',
+              actorId: command.user_id,
+              properties: { issueKey },
+            }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
             await respond({ response_type: 'in_channel', blocks, text: `Memory brief for *${issueKey}*` });
             return;
           }
@@ -94,7 +99,7 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
       // 3. If issue data is still placeholder (Jira backfill hasn't completed yet),
       //    trigger a Jira backfill which will enqueue a summary job automatically.
       const isStale = issue.title === issue.jiraIssueKey || issue.status === 'Unknown';
-      if (isStale && !summary) {
+      if (isStale) {
         // Find any existing thread link for this issue to use as backfill anchor.
         const anyLink = await prisma.issueThreadLink.findFirst({
           where: { issueId: issue.id },
@@ -144,7 +149,7 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
           event: forceRefresh ? 'brief_refreshed' : 'brief_requested',
           actorId: command.user_id,
           properties: { issueKey, channelId: command.channel_id },
-        });
+        }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
 
         await respond({
           response_type: 'ephemeral',
@@ -165,7 +170,7 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
         event: 'brief_viewed',
         actorId: command.user_id,
         properties: { issueKey, channelId: command.channel_id },
-      });
+      }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
 
       // 5. Respond in-channel with the summary
       await respond({

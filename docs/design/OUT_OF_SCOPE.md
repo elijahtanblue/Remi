@@ -24,3 +24,23 @@ Using Gmail's `users.history.list` API with a stored `historyId` for truly incre
 
 ## Per-email Slack Interactive Buttons
 Adding "Link it" / "Dismiss" action buttons to the Slack DM suggestion. Currently the DM is informational — users follow up with `/link-ticket`. Requires Slack Block Kit interactive components and an interactions handler.
+
+---
+
+## Autonomous Memory: Quality-Premium Model Upgrade (Gemini + GPT-5.4 mini)
+
+V1 ships with Gemini 2.5 Flash-Lite (Stage 1) + GPT-5.4 nano (Stages 2–3) at ~$0.55/workspace/month. When customer volume grows enough to justify eval investment and a ~55% cost increase, upgrade Stage 3 (/brief and snapshot synthesis) from `gpt-5.4-nano` to `gpt-5.4-mini`.
+
+**Estimated cost at upgrade**: ~$0.85/workspace/month.
+
+**What changes**: Stage 3 model ID in `packages/memory-engine/src/models.ts` from `gpt-5.4-nano` ($0.20/$1.25 per 1M) to `gpt-5.4-mini` ($0.75/$4.50 per 1M). Stage 1 (Gemini Flash-Lite) and Stage 4 (GPT-5.4 escalation) are unchanged.
+
+**Trigger**: Run a held-out eval set comparing `/brief` quality between `gpt-5.4-nano` and `gpt-5.4-mini`. Only upgrade if nano's output has measurable quality gaps on real customer threads AND monthly AI spend across the customer base makes the absolute cost delta worthwhile (at 1,000 workspaces: ~$300/month extra).
+
+## Autonomous Memory: DeepSeek Digest/Summary (Cheapest Confirmed Route)
+
+If cost pressure becomes significant at scale, DeepSeek-V3.2 (`deepseek-chat`) with prompt caching is the cheapest confirmed route for Stages 2–3. Estimated cost: ~$0.50/workspace/month (vs $0.55 for current stack).
+
+**Why deferred**: Quality on user-facing summaries is unvalidated. DeepSeek's output pricing ($0.42/1M) is extremely competitive but the model has not been run through an eval against Remi's actual thread data. Do not put it in front of customers without eval data.
+
+**Trigger**: Build an eval dataset of ≥50 real Slack thread samples with known expected summary outputs. If DeepSeek matches GPT-5.4 nano quality and the infra complexity of a third vendor is acceptable, swap Stages 2–3.

@@ -1,4 +1,4 @@
-import { prisma, createAuditLog } from '@remi/db';
+import { prisma, createAuditLog, createProductEvent } from '@remi/db';
 import type { SummaryJobMessage } from '@remi/shared';
 import { generateSummary } from '@remi/summary-engine';
 
@@ -32,6 +32,18 @@ export async function handleSummaryJob(message: SummaryJobMessage): Promise<void
       summaryRunId: payload.summaryRunId ?? null,
       force: payload.force ?? false,
     },
+  });
+
+  void createProductEvent(prisma, {
+    workspaceId: message.workspaceId,
+    event: 'summary_generated',
+    properties: {
+      issueId: payload.issueId,
+      triggerReason: payload.triggerReason,
+      version: result.version,
+    },
+  }).catch((err) => {
+    console.warn(`[summary-jobs] Failed to record product event for issue ${payload.issueId}`, err);
   });
 
   console.log(`[summary-jobs] Summary v${result.version} generated for issue ${payload.issueId}`);

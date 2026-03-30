@@ -9,6 +9,7 @@ import {
   findIssueThreadLink,
   createIssueThreadLink,
   createAuditLog,
+  createProductEvent,
 } from '@remi/db';
 
 const ISSUE_KEY_RE = /^[A-Z]+-\d+$/;
@@ -117,14 +118,46 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
             where: { id: issue.id },
             data: { assigneeDisplayName: assigneeName },
           });
+
+          // Re-trigger Jira backfill so title/status/assignee refresh and
+          // the summary regenerates with accurate data.
+          const refreshKey = uuidv4();
+          await queue.send(QueueNames.BACKFILL_JOBS, {
+            id: refreshKey,
+            idempotencyKey: refreshKey,
+            workspaceId,
+            timestamp: new Date().toISOString(),
+            type: 'backfill_job',
+            payload: {
+              kind: 'jira_issue_backfill',
+              issueId: issue.id,
+              threadId: thread.id,
+              linkId: existingLink.id,
+            },
+          });
+
           await respond({
             response_type: 'ephemeral',
-            text: `Updated assignee for *${issueKey}* to *${assigneeName}*.`,
+            text: `Updated assignee for *${issueKey}* to *${assigneeName}*. Refreshing issue data...`,
           });
         } else {
+          // Look up who originally linked this ticket so we can name them.
+          let linkedByLabel = '';
+          if (existingLink.linkedByUserId) {
+            try {
+              const linkedBySlackUser = await prisma.slackUser.findFirst({
+                where: { userId: existingLink.linkedByUserId, slackTeamId: teamId },
+              });
+              const name = linkedBySlackUser?.slackRealName || linkedBySlackUser?.slackUsername;
+              if (name) linkedByLabel = ` by *@${name}*`;
+            } catch {
+              // Non-fatal
+            }
+          }
+          const locationLabel = isChannelLevel ? 'channel' : 'thread';
           await respond({
             response_type: 'ephemeral',
-            text: `Already linked *${issueKey}* to this ${isChannelLevel ? 'channel' : 'thread'}. To assign someone, use \`/link-ticket ${issueKey} @username\`.`,
+            text: `Already linked *${issueKey}* to this ${locationLabel}${linkedByLabel}. To update the assignee, use \`/link-ticket ${issueKey} @username\`.`,
           });
         }
         return;
@@ -184,6 +217,18 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
           ...(mentionedUserId ? { assignedSlackUserId: mentionedUserId } : {}),
         },
       });
+
+      void createProductEvent(prisma, {
+        workspaceId,
+        event: 'link_ticket_used',
+        actorId: command.user_id,
+        properties: {
+          issueKey,
+          channelId: command.channel_id,
+          isChannelLevel,
+          hasAssignee: !!assigneeName,
+        },
+      }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
 
       // 11. Confirm
       const locationLabel = isChannelLevel ? 'channel' : 'thread';
