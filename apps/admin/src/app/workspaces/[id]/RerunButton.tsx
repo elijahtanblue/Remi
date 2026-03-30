@@ -28,7 +28,7 @@ export function RerunButton({ summaryId }: { summaryId: string }) {
     return (
       <button
         onClick={handleClick}
-        style={{ borderColor: '#dc3545', color: '#dc3545' }}
+        style={{ borderColor: 'var(--remi-danger-txt)', color: 'var(--remi-danger-txt)' }}
         title="Failed — click to retry"
       >
         Failed — retry

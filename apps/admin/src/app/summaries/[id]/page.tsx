@@ -22,13 +22,8 @@ export default async function SummaryDetailPage({ params }: Props) {
   if (error) {
     return (
       <div>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '16px' }}>Summary</h1>
-        <div
-          className="badge-red"
-          style={{ padding: '10px 14px', borderRadius: '4px', fontSize: '14px' }}
-        >
-          {error}
-        </div>
+        <div className="page-header"><h1>Summary</h1></div>
+        <div className="error-banner">{error}</div>
       </div>
     );
   }
@@ -36,8 +31,8 @@ export default async function SummaryDetailPage({ params }: Props) {
   if (!summary) {
     return (
       <div>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '16px' }}>Summary</h1>
-        <p style={{ color: '#6c757d' }}>Summary not found.</p>
+        <div className="page-header"><h1>Summary</h1></div>
+        <p style={{ color: 'var(--remi-muted)' }}>Summary not found.</p>
       </div>
     );
   }
@@ -45,7 +40,7 @@ export default async function SummaryDetailPage({ params }: Props) {
   return (
     <div>
       {/* Breadcrumb */}
-      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '8px' }}>
+      <div className="breadcrumb">
         <Link href="/summaries">Summaries</Link> /
       </div>
 
@@ -62,7 +57,7 @@ export default async function SummaryDetailPage({ params }: Props) {
           <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
             {summary.issueId ?? 'Summary'}
           </h1>
-          <code style={{ fontSize: '12px', color: '#6c757d' }}>{id}</code>
+          <code style={{ fontSize: '12px' }}>{id}</code>
         </div>
         <RerunButton summaryId={id} />
       </div>
@@ -88,18 +83,8 @@ export default async function SummaryDetailPage({ params }: Props) {
       </div>
 
       {/* Raw content */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #dee2e6',
-            fontSize: '13px',
-            fontWeight: 600,
-            background: '#f8f9fa',
-          }}
-        >
-          Raw Content
-        </div>
+      <div className="table-shell">
+        <div className="card-section-header">Raw Content</div>
         <pre style={{ margin: 0, borderRadius: 0, border: 'none' }}>
           {JSON.stringify(summary.content, null, 2)}
         </pre>
@@ -108,29 +93,10 @@ export default async function SummaryDetailPage({ params }: Props) {
   );
 }
 
-function MetaField({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
+function MetaField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <div
-        style={{
-          fontSize: '11px',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          color: '#6c757d',
-          marginBottom: '4px',
-        }}
-      >
-        {label}
-      </div>
+      <div className="meta-label">{label}</div>
       {mono ? (
         <code style={{ fontSize: '13px' }}>{value}</code>
       ) : (

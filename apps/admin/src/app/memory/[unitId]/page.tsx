@@ -51,19 +51,14 @@ export default function MemoryUnitPage() {
   if (error) {
     return (
       <div>
-        <div
-          className="badge-red"
-          style={{ padding: '10px 14px', borderRadius: '4px', fontSize: '14px' }}
-        >
-          {error}
-        </div>
+        <div className="error-banner">{error}</div>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div style={{ color: '#6c757d', fontSize: '14px', padding: '20px 0' }}>Loading…</div>
+      <div style={{ color: 'var(--remi-muted)', fontSize: '14px', padding: '20px 0' }}>Loading…</div>
     );
   }
 
@@ -72,15 +67,15 @@ export default function MemoryUnitPage() {
   return (
     <div>
       {/* Breadcrumb */}
-      <div style={{ fontSize: '13px', color: '#6c757d', marginBottom: '6px' }}>
+      <div className="breadcrumb">
         <Link href="/memory">Memory</Link> /
       </div>
 
       <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>Memory Unit</h1>
-      <p style={{ fontSize: '13px', color: '#6c757d', marginBottom: '24px' }}>
+      <p style={{ fontSize: '13px', color: 'var(--remi-muted)', marginBottom: '24px' }}>
         {data.unit.scopeType} · <code style={{ fontSize: '12px' }}>{data.unit.scopeRef}</code>
         {data.unit.issueId && (
-          <span style={{ marginLeft: '8px', color: '#6c757d' }}>· issue {data.unit.issueId}</span>
+          <span style={{ marginLeft: '8px' }}>· issue {data.unit.issueId}</span>
         )}
       </p>
 
@@ -94,14 +89,14 @@ export default function MemoryUnitPage() {
               marginBottom: '12px',
             }}
           >
-            <h2 style={{ fontSize: '16px', fontWeight: 600 }}>Latest Snapshot</h2>
-            <span style={{ fontSize: '12px', color: '#6c757d' }}>
+            <h2 className="section-heading" style={{ marginBottom: 0 }}>Latest Snapshot</h2>
+            <span style={{ fontSize: '12px', color: 'var(--remi-muted)' }}>
               v{latest.version} · {Math.round(latest.confidence * 100)}% confidence
             </span>
           </div>
           <div className="card">
             <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>{latest.headline}</h3>
-            <p style={{ fontSize: '14px', color: '#495057', marginBottom: '16px' }}>{latest.currentState}</p>
+            <p style={{ fontSize: '14px', color: 'var(--remi-muted)', marginBottom: '16px' }}>{latest.currentState}</p>
 
             {latest.keyDecisions.length > 0 && (
               <div style={{ marginBottom: '12px' }}>
@@ -122,7 +117,7 @@ export default function MemoryUnitPage() {
                     <li key={i} style={{ marginBottom: '2px' }}>
                       {a.description}
                       {a.assignee && (
-                        <span style={{ color: '#6c757d', marginLeft: '6px' }}>({a.assignee})</span>
+                        <span style={{ color: 'var(--remi-muted)', marginLeft: '6px' }}>({a.assignee})</span>
                       )}
                     </li>
                   ))}
@@ -132,8 +127,8 @@ export default function MemoryUnitPage() {
 
             {latest.blockers.length > 0 && (
               <div style={{ marginBottom: '12px' }}>
-                <strong style={{ fontSize: '13px', color: '#721c24' }}>Blockers</strong>
-                <ul style={{ marginTop: '4px', paddingLeft: '20px', fontSize: '13px', color: '#721c24' }}>
+                <strong style={{ fontSize: '13px', color: 'var(--remi-danger-txt)' }}>Blockers</strong>
+                <ul style={{ marginTop: '4px', paddingLeft: '20px', fontSize: '13px', color: 'var(--remi-danger-txt)' }}>
                   {latest.blockers.map((b, i) => (
                     <li key={i} style={{ marginBottom: '2px' }}>{b}</li>
                   ))}
@@ -155,21 +150,11 @@ export default function MemoryUnitPage() {
         </section>
       )}
 
-      <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>
-        Snapshot History{' '}
-        <span
-          style={{
-            fontSize: '12px',
-            background: '#e9ecef',
-            borderRadius: '10px',
-            padding: '1px 7px',
-            marginLeft: '4px',
-          }}
-        >
-          {data.snapshots.length}
-        </span>
+      <h2 className="section-heading">
+        Snapshot History
+        <span className="tab-count">{data.snapshots.length}</span>
       </h2>
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="table-shell">
         <table>
           <thead>
             <tr>
@@ -182,9 +167,7 @@ export default function MemoryUnitPage() {
           <tbody>
             {data.snapshots.length === 0 ? (
               <tr>
-                <td colSpan={4} style={{ textAlign: 'center', color: '#6c757d', padding: '24px' }}>
-                  No snapshots yet.
-                </td>
+                <td colSpan={4} className="empty-cell">No snapshots yet.</td>
               </tr>
             ) : (
               data.snapshots.map((s) => (
@@ -198,7 +181,7 @@ export default function MemoryUnitPage() {
                       {Math.round(s.confidence * 100)}%
                     </span>
                   </td>
-                  <td style={{ color: '#6c757d', fontSize: '13px' }}>
+                  <td style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>
                     {new Date(s.createdAt).toLocaleString()}
                   </td>
                 </tr>

@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import Image from 'next/image';
 import Link from 'next/link';
 
 export default async function DashboardPage() {
@@ -12,46 +13,83 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>
-        Remi Admin Dashboard
-      </h1>
-      <p style={{ color: '#6c757d', marginBottom: '28px', fontSize: '14px' }}>
-        Operational tools for managing Remi workspaces, summaries, and queue health.
-      </p>
-
-      {/* Stats row */}
+      {/* Hero */}
       <div
+        className="card"
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          gap: '16px',
           marginBottom: '32px',
+          padding: 0,
+          overflow: 'hidden',
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          alignItems: 'stretch',
         }}
       >
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '36px', fontWeight: 700, color: '#0066cc' }}>
-            {workspaceCount}
+        {/* Left: text + stat */}
+        <div style={{ padding: '36px 40px' }}>
+          <h1
+            style={{
+              fontSize: '28px',
+              fontWeight: 700,
+              fontFamily: 'var(--remi-serif)',
+              color: 'var(--remi-navy)',
+              marginBottom: '10px',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Remi Admin
+          </h1>
+          <p
+            style={{
+              color: 'var(--remi-muted)',
+              fontSize: '14px',
+              maxWidth: '400px',
+              lineHeight: 1.6,
+              marginBottom: '28px',
+            }}
+          >
+            Operational tools for managing Remi workspaces, summaries, and queue health.
+          </p>
+          <div className="stat-card" style={{ display: 'inline-block', minWidth: '120px' }}>
+            <div className="stat-number">{workspaceCount}</div>
+            <div className="stat-label">Workspaces</div>
           </div>
-          <div style={{ fontSize: '13px', color: '#6c757d', marginTop: '4px' }}>Workspaces</div>
+        </div>
+
+        {/* Right: brand logo panel */}
+        <div
+          style={{
+            background: 'var(--remi-accent-soft)',
+            borderLeft: '1px solid var(--remi-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '32px 40px',
+            minWidth: '260px',
+          }}
+        >
+          <Image
+            src="/brand/remi-light.png"
+            alt="Remi"
+            width={200}
+            height={130}
+            style={{ objectFit: 'contain', borderRadius: '8px' }}
+          />
         </div>
       </div>
 
-      {/* Activity note */}
-      <div
-        className="card"
-        style={{ marginBottom: '24px', background: '#fff8e1', borderColor: '#ffe082' }}
-      >
-        <p style={{ fontSize: '14px', color: '#5d4037' }}>
-          Select a workspace to view summaries and audit logs.
-        </p>
+      {/* Guidance note */}
+      <div className="info-card" style={{ marginBottom: '28px' }}>
+        Select a workspace to view summaries and audit logs.{' '}
+        <Link href="/workspaces">Browse Workspaces &rarr;</Link>
       </div>
 
       {/* Quick links */}
-      <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Quick Links</h2>
+      <h2 className="section-heading">Quick Links</h2>
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
           gap: '16px',
         }}
       >
@@ -69,12 +107,12 @@ function QuickLink({ href, title, desc }: { href: string; title: string; desc: s
     <Link href={href} style={{ textDecoration: 'none' }}>
       <div
         className="card"
-        style={{ cursor: 'pointer', transition: 'box-shadow 0.15s', height: '100%' }}
+        style={{ cursor: 'pointer', height: '100%', transition: 'box-shadow 0.15s, border-color 0.15s' }}
       >
-        <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '6px', color: '#212529' }}>
+        <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '6px', color: 'var(--remi-ink)' }}>
           {title}
         </div>
-        <div style={{ fontSize: '13px', color: '#6c757d' }}>{desc}</div>
+        <div style={{ fontSize: '13px', color: 'var(--remi-muted)' }}>{desc}</div>
       </div>
     </Link>
   );

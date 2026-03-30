@@ -20,7 +20,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   return (
     <button onClick={() => onChange(!checked)} style={{
       width: '40px', height: '22px', borderRadius: '11px', border: 'none',
-      background: checked ? '#0066cc' : '#dee2e6', position: 'relative',
+      background: checked ? 'var(--remi-navy)' : 'var(--remi-border)', position: 'relative',
       cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 0,
     }}>
       <span style={{
@@ -38,7 +38,7 @@ function SettingRow({ label, description, children }: {
   return (
     <div style={{
       display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-      gap: '24px', padding: '16px 0', borderBottom: '1px solid #f1f3f5',
+      gap: '24px', padding: '16px 0', borderBottom: '1px solid var(--remi-border)',
     }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: '14px', fontWeight: 500, color: '#212529' }}>{label}</div>
@@ -52,7 +52,7 @@ function SettingRow({ label, description, children }: {
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="card" style={{ marginBottom: '20px', padding: 0 }}>
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f3f5', background: '#fafbfc', borderRadius: '8px 8px 0 0' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--remi-border)', background: 'var(--remi-accent-soft)', borderRadius: '8px 8px 0 0' }}>
         <span style={{ fontSize: '13px', fontWeight: 600, color: '#495057', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           {title}
         </span>
@@ -63,11 +63,11 @@ function SectionCard({ title, children }: { title: string; children: React.React
 }
 
 function selectStyle(): React.CSSProperties {
-  return { padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6', borderRadius: '6px', background: '#fff', cursor: 'pointer' };
+  return { padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)', borderRadius: '6px', background: '#fff', cursor: 'pointer' };
 }
 
 function inputStyle(width = '200px'): React.CSSProperties {
-  return { width, padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6', borderRadius: '6px' };
+  return { width, padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)', borderRadius: '6px' };
 }
 
 const SENSITIVITY_OPTIONS: ThreadSensitivity[] = ['public', 'internal', 'confidential', 'restricted'];
@@ -90,21 +90,21 @@ function MailboxGroupEditor({ group, onChange, onRemove }: GroupEditorProps) {
     onChange({ ...group, alertPolicy: { ...group.alertPolicy, [k]: v } });
 
   return (
-    <div style={{ border: '1px solid #dee2e6', borderRadius: '8px', marginBottom: '12px' }}>
+    <div style={{ border: '1px solid var(--remi-border)', borderRadius: '8px', marginBottom: '12px' }}>
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: '12px', cursor: 'pointer', background: '#fafbfc', borderRadius: open ? '8px 8px 0 0' : '8px' }}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: '12px', cursor: 'pointer', background: 'var(--remi-accent-soft)', borderRadius: open ? '8px 8px 0 0' : '8px' }}
         onClick={() => setOpen(!open)}>
         <span style={{ flex: 1, fontWeight: 600, fontSize: '14px', color: '#212529' }}>{group.name || 'Unnamed group'}</span>
         <span style={{
           fontSize: '11px', padding: '2px 8px', borderRadius: '10px', fontWeight: 500,
-          background: group.retentionMode === 'full_body_allowed' ? '#fff3cd' : '#e8f4ff',
-          color: group.retentionMode === 'full_body_allowed' ? '#856404' : '#0066cc',
+          background: group.retentionMode === 'full_body_allowed' ? '#fff3cd' : 'var(--remi-accent-soft)',
+          color: group.retentionMode === 'full_body_allowed' ? '#856404' : 'var(--remi-navy)',
         }}>
           {group.retentionMode === 'full_body_allowed' ? 'Full body' : 'Signals only'}
         </span>
         <span style={{ fontSize: '12px', color: '#6c757d' }}>{open ? '▲' : '▼'}</span>
         <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{
-          padding: '3px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #dee2e6',
+          padding: '3px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--remi-border)',
           background: '#fff', color: '#dc3545', cursor: 'pointer',
         }}>Remove</button>
       </div>
@@ -208,7 +208,7 @@ function ActorClassificationSection() {
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#212529' }}>Contact mappings (exact email)</span>
-            <button onClick={addContact} style={{ padding: '4px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid #0066cc', background: '#e8f4ff', color: '#0066cc', cursor: 'pointer' }}>
+            <button onClick={addContact} style={{ padding: '4px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--remi-navy)', background: 'var(--remi-accent-soft)', color: 'var(--remi-navy)', cursor: 'pointer' }}>
               + Add contact
             </button>
           </div>
@@ -234,7 +234,7 @@ function ActorClassificationSection() {
                 {SENSITIVITY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
               <button onClick={() => setContacts(prev => prev.filter((_, j) => j !== i))}
-                style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #dee2e6', background: '#fff', color: '#dc3545', cursor: 'pointer' }}>
+                style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--remi-border)', background: '#fff', color: '#dc3545', cursor: 'pointer' }}>
                 ✕
               </button>
             </div>
@@ -245,7 +245,7 @@ function ActorClassificationSection() {
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#212529' }}>Domain mappings</span>
-            <button onClick={addDomain} style={{ padding: '4px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid #0066cc', background: '#e8f4ff', color: '#0066cc', cursor: 'pointer' }}>
+            <button onClick={addDomain} style={{ padding: '4px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--remi-navy)', background: 'var(--remi-accent-soft)', color: 'var(--remi-navy)', cursor: 'pointer' }}>
               + Add domain
             </button>
           </div>
@@ -271,7 +271,7 @@ function ActorClassificationSection() {
                 {SENSITIVITY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
               <button onClick={() => setDomains(prev => prev.filter((_, j) => j !== i))}
-                style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #dee2e6', background: '#fff', color: '#dc3545', cursor: 'pointer' }}>
+                style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--remi-border)', background: '#fff', color: '#dc3545', cursor: 'pointer' }}>
                 ✕
               </button>
             </div>
@@ -335,7 +335,7 @@ function AccessPoliciesSection() {
           Define which viewer roles can access which actor types. Default deny: unmatched roles receive no access.
         </div>
         {rules.map((rule, i) => (
-          <div key={i} style={{ border: '1px solid #f1f3f5', borderRadius: '6px', padding: '12px 14px', marginBottom: '10px', background: '#fafbfc' }}>
+          <div key={i} style={{ border: '1px solid #f1f3f5', borderRadius: '6px', padding: '12px 14px', marginBottom: '10px', background: 'var(--remi-accent-soft)' }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: '11px', color: '#6c757d', marginBottom: '4px' }}>VIEWER ROLE</div>
@@ -353,8 +353,8 @@ function AccessPoliciesSection() {
                     return (
                       <button key={type} onClick={() => toggleActorType(i, type)} style={{
                         padding: '4px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: 500,
-                        border: '1px solid', borderColor: active ? '#0066cc' : '#dee2e6',
-                        background: active ? '#e8f4ff' : '#fff', color: active ? '#0066cc' : '#6c757d', cursor: 'pointer',
+                        border: '1px solid', borderColor: active ? 'var(--remi-navy)' : 'var(--remi-border)',
+                        background: active ? 'var(--remi-accent-soft)' : 'var(--remi-surface)', color: active ? 'var(--remi-navy)' : 'var(--remi-muted)', cursor: 'pointer',
                       }}>
                         {type}
                       </button>
@@ -380,13 +380,13 @@ function AccessPoliciesSection() {
                 </div>
               </div>
               <button onClick={() => setRules(prev => prev.filter((_, j) => j !== i))}
-                style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #dee2e6', background: '#fff', color: '#dc3545', cursor: 'pointer', marginTop: '18px' }}>
+                style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--remi-border)', background: '#fff', color: '#dc3545', cursor: 'pointer', marginTop: '18px' }}>
                 Remove
               </button>
             </div>
           </div>
         ))}
-        <button onClick={addRule} style={{ padding: '6px 14px', fontSize: '13px', borderRadius: '6px', border: '1px solid #0066cc', background: '#e8f4ff', color: '#0066cc', cursor: 'pointer' }}>
+        <button onClick={addRule} style={{ padding: '6px 14px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--remi-navy)', background: 'var(--remi-accent-soft)', color: 'var(--remi-navy)', cursor: 'pointer' }}>
           + Add policy rule
         </button>
       </div>
@@ -449,7 +449,7 @@ function BlockerDetectionSection() {
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '360px' }}>
               {keywords.map(kw => (
                 <span key={kw} onClick={() => setKeywords(prev => prev.filter(k => k !== kw))}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '14px', fontSize: '12px', fontWeight: 500, background: '#e8f4ff', color: '#0066cc', border: '1px solid #b6d4fe', cursor: 'pointer' }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '14px', fontSize: '12px', fontWeight: 500, background: 'var(--remi-accent-soft)', color: 'var(--remi-navy)', border: '1px solid #b6d4fe', cursor: 'pointer' }}>
                   {kw} <span style={{ opacity: 0.6, fontSize: '11px' }}>✕</span>
                 </span>
               ))}
@@ -458,8 +458,8 @@ function BlockerDetectionSection() {
               <input value={newKw} onChange={(e) => setNewKw(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addKw()}
                 placeholder="Add keyword…"
-                style={{ width: '140px', padding: '5px 8px', fontSize: '12px', border: '1px solid #dee2e6', borderRadius: '6px' }} />
-              <button onClick={addKw} style={{ padding: '5px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #dee2e6', background: '#fff', cursor: 'pointer' }}>
+                style={{ width: '140px', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--remi-border)', borderRadius: '6px' }} />
+              <button onClick={addKw} style={{ padding: '5px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--remi-border)', background: '#fff', cursor: 'pointer' }}>
                 Add
               </button>
             </div>
@@ -539,14 +539,14 @@ export default function EmailSettingsClient({ provider }: { provider: Provider }
           {connectedAccount ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '13px', color: '#212529' }}>{connectedAccount}</span>
-              <button onClick={() => setConnectedAccount('')} style={{ padding: '5px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid #dee2e6', background: '#fff', color: '#dc3545', cursor: 'pointer' }}>
+              <button onClick={() => setConnectedAccount('')} style={{ padding: '5px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--remi-border)', background: '#fff', color: '#dc3545', cursor: 'pointer' }}>
                 Disconnect
               </button>
             </div>
           ) : (
             <button
               onClick={() => setConnectedAccount('admin@example.com')}
-              style={{ padding: '7px 16px', fontSize: '13px', fontWeight: 600, borderRadius: '6px', border: '1px solid #0066cc', background: '#0066cc', color: '#fff', cursor: 'pointer' }}>
+              style={{ padding: '7px 16px', fontSize: '13px', fontWeight: 600, borderRadius: '6px', border: '1px solid var(--remi-navy)', background: 'var(--remi-navy)', color: '#fff', cursor: 'pointer' }}>
               Connect {providerName} account
             </button>
           )}
@@ -570,7 +570,7 @@ export default function EmailSettingsClient({ provider }: { provider: Provider }
           ))}
           <button
             onClick={() => setGroups(prev => [...prev, newGroup(`Group ${prev.length + 1}`)])}
-            style={{ padding: '6px 14px', fontSize: '13px', borderRadius: '6px', border: '1px solid #0066cc', background: '#e8f4ff', color: '#0066cc', cursor: 'pointer' }}>
+            style={{ padding: '6px 14px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--remi-navy)', background: 'var(--remi-accent-soft)', color: 'var(--remi-navy)', cursor: 'pointer' }}>
             + Add mailbox group
           </button>
         </div>

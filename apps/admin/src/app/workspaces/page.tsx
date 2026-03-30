@@ -18,14 +18,13 @@ export default async function WorkspacesPage() {
 
       {error && (
         <div
-          className="card badge-red"
-          style={{ marginBottom: '16px', padding: '12px 16px', borderRadius: '4px' }}
+          className="error-banner"
         >
           {error}
         </div>
       )}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="table-shell">
         <table>
           <thead>
             <tr>
@@ -38,7 +37,7 @@ export default async function WorkspacesPage() {
           <tbody>
             {workspaces.length === 0 && !error ? (
               <tr>
-                <td colSpan={4} style={{ textAlign: 'center', color: '#6c757d', padding: '24px' }}>
+                <td colSpan={4} className="empty-cell">
                   No workspaces found
                 </td>
               </tr>
@@ -53,7 +52,7 @@ export default async function WorkspacesPage() {
                         {slackName}
                       </Link>
                       {ws.slackInstalls?.[0] ? null : (
-                        <span style={{ marginLeft: '8px', fontSize: '12px', color: '#6c757d' }}>
+                        <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--remi-muted)' }}>
                           (no Slack)
                         </span>
                       )}
@@ -62,13 +61,13 @@ export default async function WorkspacesPage() {
                       {jiraSite ? (
                         <code style={{ fontSize: '13px' }}>{jiraSite.replace('https://', '')}</code>
                       ) : (
-                        <span style={{ color: '#6c757d' }}>not connected</span>
+                        <span style={{ color: 'var(--remi-muted)' }}>not connected</span>
                       )}
                     </td>
                     <td>
-                      <code style={{ fontSize: '12px', color: '#6c757d' }}>{ws.id}</code>
+                      <code style={{ fontSize: '12px', color: 'var(--remi-muted)' }}>{ws.id}</code>
                     </td>
-                    <td style={{ color: '#6c757d', fontSize: '13px' }}>
+                    <td style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>
                       {ws.createdAt ? new Date(ws.createdAt).toLocaleString() : '—'}
                     </td>
                   </tr>

@@ -20,8 +20,8 @@ export default function NavBar() {
   return (
     <nav
       style={{
-        background: '#1a1d23',
-        borderBottom: '1px solid #2d3139',
+        background: 'var(--remi-navy)',
+        borderBottom: '2px solid var(--remi-navy-deep)',
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -38,18 +38,18 @@ export default function NavBar() {
           gap: '8px',
         }}
       >
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginRight: '24px', flexShrink: 0 }}>
-          <span style={{ fontSize: '17px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>
+        {/* Brand lockup */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginRight: '28px', flexShrink: 0 }}>
+          <span style={{ fontSize: '17px', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--remi-serif)', letterSpacing: '-0.01em' }}>
             Remi
           </span>
-          <span style={{ fontSize: '11px', color: '#6e7681', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.48)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
             Admin
           </span>
         </div>
 
         {/* Nav links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flex: 1, overflowX: 'auto' }}>
           {links.map(({ href, label }) => {
             const isActive =
               href === '/' ? pathname === '/' : pathname.startsWith(href);
@@ -61,11 +61,11 @@ export default function NavBar() {
                   padding: '6px 12px',
                   fontSize: '13px',
                   fontWeight: isActive ? 600 : 400,
-                  color: isActive ? '#ffffff' : '#8b949e',
+                  color: isActive ? '#ffffff' : 'rgba(255,255,255,0.62)',
                   textDecoration: 'none',
                   borderRadius: '6px',
-                  background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  transition: 'background 0.1s, color 0.1s',
+                  background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
+                  transition: 'background 0.12s, color 0.12s',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -79,12 +79,13 @@ export default function NavBar() {
         <span
           style={{
             fontSize: '11px',
-            background: 'rgba(212, 237, 218, 0.15)',
-            color: '#4caf87',
+            background: 'rgba(255,255,255,0.1)',
+            color: 'rgba(255,255,255,0.62)',
             padding: '2px 10px',
             borderRadius: '12px',
             fontWeight: 500,
             flexShrink: 0,
+            border: '1px solid rgba(255,255,255,0.15)',
           }}
         >
           Internal

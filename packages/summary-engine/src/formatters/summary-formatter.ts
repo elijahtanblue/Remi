@@ -13,7 +13,7 @@ function excerptText(text: string, maxLen = 120): string {
 export function formatSummary(
   collected: CollectedData,
   analysis: AnalysisResult,
-  score: { score: number; recommendedNextStep: string; missingSignals: string[] },
+  score: { recommendedNextStep: string; missingSignals: string[] },
 ): SummaryOutput {
   const { issue, threads } = collected;
 

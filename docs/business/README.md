@@ -115,7 +115,6 @@ Each summary includes:
 - **Blockers** — any blocking issues detected from keywords in Slack/Jira
 - **Open questions** — unanswered questions from the thread
 - **Ownership** — who is assigned and who has been most active
-- **Completeness score** — 0–100, how well-documented this issue is
 - **Recommended next step** — what Remi thinks should happen next
 
 ---
@@ -165,11 +164,13 @@ See [SETUP.md — Step 14](SETUP.md#step-14-enable-gmail-integration-optional) f
 The admin dashboard at [admin.memoremi.com](https://admin.memoremi.com) is for operators, not end users. It shows:
 
 - **Workspaces** — every Slack workspace that has installed Remi, with their Jira site
-- **Summaries** — full summary history with completeness scores and a re-run button
+- **Summaries** — full summary history with a re-run button
 - **Dead Letters** — failed jobs that need attention, with a retry button
 - **Audit Log** — complete record of every action Remi has taken
-- **Analytics** — feature usage counts (link_ticket_used, brief_viewed, etc.) across all workspaces
-- **Integrations** — configure Gmail for a workspace
+- **Analytics** — feature usage counts (`link_ticket_used`, `brief_viewed`, etc.) across all workspaces
+- **Integrations** — configure Slack, Jira, Gmail, and Outlook settings per workspace
+- **Memory** — view autonomous memory units and pending writeback proposals per workspace; approve or reject proposals before they are applied to Jira
+
 
 Access requires the `ADMIN_API_KEY` set in your environment.
 

@@ -920,7 +920,7 @@ Visit `https://admin.memoremi.com` once the app is running (or `http://YOUR_EC2_
 The admin dashboard shows:
 - All workspaces and their Slack/Jira install status
 - Recent issue-thread links
-- Summary history with completeness scores and re-run button
+- Summary history with re-run button
 - Failed jobs (dead letters) with retry button
 - Audit log of all actions
 
@@ -934,7 +934,7 @@ The engine:
 1. Collects current issue state + all events from Postgres
 2. Collects all messages from linked Slack threads
 3. Runs analyzers: status drift, blocker detection (keyword scan), open question detection, ownership analysis
-4. Scores completeness (0–100) and picks a recommended next step
+4. Picks a recommended next step and surfaces any missing signals
 5. Persists the typed output as a new `Summary` row, superseding the previous version
 
 Summaries regenerate on: status change, assignee change, priority change, new linked Slack messages, or manual `/brief --refresh`.

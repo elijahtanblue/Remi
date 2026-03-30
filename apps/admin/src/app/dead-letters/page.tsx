@@ -22,56 +22,29 @@ export default async function DeadLettersPage({ searchParams }: Props) {
 
   return (
     <div>
-      <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>Dead Letters</h1>
-      <p style={{ color: '#6c757d', fontSize: '14px', marginBottom: '20px' }}>
-        Messages that failed processing and were moved to the dead letter queue.
-      </p>
+      <div className="page-header">
+        <h1>Dead Letters</h1>
+        <p>Messages that failed processing and were moved to the dead letter queue.</p>
+      </div>
 
       {/* Queue filter */}
-      <form
-        method="GET"
-        style={{ marginBottom: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}
-      >
-        <label style={{ fontSize: '13px', color: '#495057', fontWeight: 500 }}>
-          Queue:
-        </label>
+      <form method="GET" className="filter-bar">
+        <label>Queue:</label>
         <input
           name="queue"
           defaultValue={queue ?? ''}
           placeholder="Filter by queue name…"
-          style={{
-            padding: '6px 10px',
-            border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            fontSize: '13px',
-            width: '220px',
-          }}
+          style={{ width: '220px' }}
         />
-        <button type="submit" style={{ background: '#0066cc', color: 'white', borderColor: '#0066cc' }}>
-          Filter
-        </button>
+        <button type="submit" className="btn-primary">Filter</button>
         {queue && (
-          <a href="/dead-letters" style={{ fontSize: '13px' }}>
-            Clear
-          </a>
+          <a href="/dead-letters" style={{ fontSize: '13px' }}>Clear</a>
         )}
       </form>
 
-      {error && (
-        <div
-          className="badge-red"
-          style={{
-            marginBottom: '16px',
-            padding: '10px 14px',
-            borderRadius: '4px',
-            fontSize: '14px',
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <div className="error-banner">{error}</div>}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="table-shell">
         <table>
           <thead>
             <tr>
@@ -86,7 +59,7 @@ export default async function DeadLettersPage({ searchParams }: Props) {
           <tbody>
             {items.length === 0 && !error ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: '#6c757d', padding: '24px' }}>
+                <td colSpan={6} className="empty-cell">
                   {queue ? `No dead letters found for queue "${queue}"` : 'No dead letters found'}
                 </td>
               </tr>
@@ -97,14 +70,12 @@ export default async function DeadLettersPage({ searchParams }: Props) {
                     <code style={{ fontSize: '13px' }}>{item.queue ?? '—'}</code>
                   </td>
                   <td>
-                    <code style={{ fontSize: '12px', color: '#6c757d' }}>
-                      {item.messageId ?? item.id ?? '—'}
-                    </code>
+                    <code style={{ fontSize: '12px' }}>{item.messageId ?? item.id ?? '—'}</code>
                   </td>
                   <td
                     style={{
                       fontSize: '13px',
-                      color: '#721c24',
+                      color: 'var(--remi-danger-txt)',
                       maxWidth: '280px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -116,16 +87,14 @@ export default async function DeadLettersPage({ searchParams }: Props) {
                   </td>
                   <td style={{ fontSize: '13px', textAlign: 'center' }}>
                     {item.retryCount != null ? (
-                      <span
-                        className={`badge ${item.retryCount >= 3 ? 'badge-red' : 'badge-yellow'}`}
-                      >
+                      <span className={`badge ${item.retryCount >= 3 ? 'badge-red' : 'badge-yellow'}`}>
                         {item.retryCount}
                       </span>
                     ) : (
                       '—'
                     )}
                   </td>
-                  <td style={{ color: '#6c757d', fontSize: '13px' }}>
+                  <td style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>
                     {item.failedAt
                       ? new Date(item.failedAt).toLocaleString()
                       : item.createdAt
@@ -144,17 +113,13 @@ export default async function DeadLettersPage({ searchParams }: Props) {
 
       {/* Pagination */}
       {items.length === limit && (
-        <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+        <div className="pagination">
           {offset > 0 && (
-            <a
-              href={`/dead-letters?queue=${queue ?? ''}&limit=${limit}&offset=${Math.max(0, offset - limit)}`}
-            >
+            <a href={`/dead-letters?queue=${queue ?? ''}&limit=${limit}&offset=${Math.max(0, offset - limit)}`}>
               &larr; Previous
             </a>
           )}
-          <a
-            href={`/dead-letters?queue=${queue ?? ''}&limit=${limit}&offset=${offset + limit}`}
-          >
+          <a href={`/dead-letters?queue=${queue ?? ''}&limit=${limit}&offset=${offset + limit}`}>
             Next &rarr;
           </a>
         </div>

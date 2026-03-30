@@ -21,4 +21,3 @@ settings.local.json
 *gcp-keys.json
 !.env.example
 .pem keys/gcp-keys.json
-apps/admin/public

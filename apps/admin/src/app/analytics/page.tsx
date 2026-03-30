@@ -29,19 +29,15 @@ export default async function AnalyticsPage({
   const maxCount = data.counts[0]?.count ?? 1;
 
   return (
-    <div style={{ maxWidth: '900px', margin: '40px auto', padding: '0 28px' }}>
+    <div>
       {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#e6edf3', margin: 0 }}>
-          Product Analytics
-        </h1>
-        <p style={{ color: '#8b949e', fontSize: '13px', marginTop: '6px' }}>
-          Feature usage across all workspaces — Postgres-backed, no third-party tracking.
-        </p>
+      <div className="page-header">
+        <h1>Product Analytics</h1>
+        <p>Feature usage across all workspaces — Postgres-backed, no third-party tracking.</p>
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '28px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '28px', flexWrap: 'wrap', alignItems: 'center' }}>
         {SINCE_OPTIONS.map((opt) => (
           <a
             key={opt.value}
@@ -50,10 +46,10 @@ export default async function AnalyticsPage({
               padding: '5px 14px',
               fontSize: '12px',
               fontWeight: opt.value === sinceDays ? 600 : 400,
-              color: opt.value === sinceDays ? '#ffffff' : '#8b949e',
-              background: opt.value === sinceDays ? 'rgba(255,255,255,0.10)' : 'transparent',
+              color: opt.value === sinceDays ? '#fff' : 'var(--remi-muted)',
+              background: opt.value === sinceDays ? 'var(--remi-navy)' : 'transparent',
               border: '1px solid',
-              borderColor: opt.value === sinceDays ? 'rgba(255,255,255,0.15)' : '#30363d',
+              borderColor: opt.value === sinceDays ? 'var(--remi-navy)' : 'var(--remi-border)',
               borderRadius: '6px',
               textDecoration: 'none',
             }}
@@ -61,8 +57,7 @@ export default async function AnalyticsPage({
             {opt.label}
           </a>
         ))}
-
-        <span style={{ marginLeft: 'auto', color: '#6e7681', fontSize: '12px', alignSelf: 'center' }}>
+        <span style={{ marginLeft: 'auto', color: 'var(--remi-muted)', fontSize: '12px', alignSelf: 'center' }}>
           {total.toLocaleString()} total events
         </span>
       </div>
@@ -70,95 +65,43 @@ export default async function AnalyticsPage({
       {/* Event count table */}
       {data.counts.length === 0 ? (
         <div
-          style={{
-            background: '#161b22',
-            border: '1px solid #30363d',
-            borderRadius: '8px',
-            padding: '48px',
-            textAlign: 'center',
-            color: '#6e7681',
-            fontSize: '13px',
-          }}
+          className="card"
+          style={{ textAlign: 'center', color: 'var(--remi-muted)', padding: '48px', fontSize: '14px' }}
         >
           No events recorded in this period. Events will appear here once users start using Remi.
         </div>
       ) : (
-        <div
-          style={{
-            background: '#161b22',
-            border: '1px solid #30363d',
-            borderRadius: '8px',
-            overflow: 'hidden',
-          }}
-        >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="table-shell">
+          <table>
             <thead>
-              <tr style={{ borderBottom: '1px solid #30363d' }}>
-                <th
-                  style={{
-                    textAlign: 'left',
-                    padding: '12px 20px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#6e7681',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                  }}
-                >
-                  Event
-                </th>
-                <th
-                  style={{
-                    textAlign: 'right',
-                    padding: '12px 20px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#6e7681',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    width: '90px',
-                  }}
-                >
-                  Count
-                </th>
-                <th style={{ padding: '12px 20px', width: '40%' }} />
+              <tr>
+                <th>Event</th>
+                <th style={{ textAlign: 'right', width: '90px' }}>Count</th>
+                <th style={{ width: '40%' }} />
               </tr>
             </thead>
             <tbody>
-              {data.counts.map((row, i) => {
+              {data.counts.map((row) => {
                 const pct = Math.round((row.count / maxCount) * 100);
                 return (
-                  <tr
-                    key={row.event}
-                    style={{
-                      borderTop: i > 0 ? '1px solid #21262d' : undefined,
-                    }}
-                  >
-                    <td style={{ padding: '14px 20px' }}>
-                      <span style={{ fontSize: '13px', color: '#e6edf3', fontWeight: 500 }}>
+                  <tr key={row.event}>
+                    <td>
+                      <span style={{ fontSize: '13px', color: 'var(--remi-ink)', fontWeight: 500 }}>
                         {EVENT_LABELS[row.event] ?? row.event}
                       </span>
                       <br />
-                      <span style={{ fontSize: '11px', color: '#6e7681', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--remi-muted)', fontFamily: 'monospace' }}>
                         {row.event}
                       </span>
                     </td>
-                    <td
-                      style={{
-                        padding: '14px 20px',
-                        textAlign: 'right',
-                        fontSize: '15px',
-                        fontWeight: 600,
-                        color: '#e6edf3',
-                      }}
-                    >
+                    <td style={{ textAlign: 'right', fontSize: '15px', fontWeight: 600, color: 'var(--remi-ink)' }}>
                       {row.count.toLocaleString()}
                     </td>
-                    <td style={{ padding: '14px 20px' }}>
+                    <td>
                       <div
                         style={{
                           height: '6px',
-                          background: '#21262d',
+                          background: 'var(--remi-border)',
                           borderRadius: '3px',
                           overflow: 'hidden',
                         }}
@@ -167,7 +110,7 @@ export default async function AnalyticsPage({
                           style={{
                             width: `${pct}%`,
                             height: '100%',
-                            background: '#4caf87',
+                            background: 'var(--remi-navy)',
                             borderRadius: '3px',
                           }}
                         />
@@ -181,7 +124,7 @@ export default async function AnalyticsPage({
         </div>
       )}
 
-      <p style={{ color: '#6e7681', fontSize: '11px', marginTop: '16px' }}>
+      <p style={{ color: 'var(--remi-muted)', fontSize: '11px', marginTop: '16px' }}>
         Since {new Date(data.since).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}.
         {workspaceId ? ` Filtered to workspace ${workspaceId}.` : ' All workspaces.'}
       </p>

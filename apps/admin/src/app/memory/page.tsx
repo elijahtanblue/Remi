@@ -95,46 +95,28 @@ export default function MemoryPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '20px' }}>Autonomous Memory</h1>
+      <div className="page-header">
+        <h1>Autonomous Memory</h1>
+      </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+      <div className="filter-bar" style={{ marginBottom: '20px' }}>
         <input
-          style={{
-            flex: 1,
-            padding: '6px 10px',
-            border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            fontSize: '14px',
-          }}
           placeholder="Workspace ID"
           value={workspaceId}
           onChange={(e) => setWorkspaceId(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && load(workspaceId)}
+          style={{ flex: 1 }}
         />
         <button
           onClick={() => load(workspaceId)}
           disabled={loading}
-          style={{
-            background: '#0066cc',
-            color: 'white',
-            border: 'none',
-            padding: '6px 14px',
-            borderRadius: '4px',
-            fontSize: '14px',
-          }}
+          className="btn-primary"
         >
           {loading ? 'Loading…' : 'Load'}
         </button>
       </div>
 
-      {error && (
-        <div
-          className="badge-red"
-          style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '4px', fontSize: '14px' }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <div className="error-banner">{error}</div>}
 
       {loaded && !loading && (
         <>
@@ -142,14 +124,8 @@ export default function MemoryPage() {
             <span style={{ fontWeight: 600, fontSize: '14px' }}>Autonomous Memory:</span>
             <button
               onClick={toggleEnabled}
-              style={{
-                background: enabled ? '#198754' : '#6c757d',
-                color: 'white',
-                border: 'none',
-                padding: '4px 12px',
-                borderRadius: '4px',
-                fontSize: '13px',
-              }}
+              className={enabled ? 'btn-success' : 'btn-neutral'}
+              style={{ padding: '4px 14px', fontSize: '13px' }}
             >
               {enabled ? 'Enabled' : 'Disabled'}
             </button>
@@ -157,22 +133,11 @@ export default function MemoryPage() {
 
           {proposals.length > 0 && (
             <section style={{ marginBottom: '32px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>
-                Pending Writeback Proposals{' '}
-                <span
-                  style={{
-                    fontSize: '12px',
-                    background: '#fff3cd',
-                    color: '#856404',
-                    borderRadius: '10px',
-                    padding: '1px 7px',
-                    marginLeft: '4px',
-                  }}
-                >
-                  {proposals.length}
-                </span>
+              <h2 className="section-heading">
+                Pending Writeback Proposals
+                <span className="badge badge-yellow">{proposals.length}</span>
               </h2>
-              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="table-shell">
                 <table>
                   <thead>
                     <tr>
@@ -187,7 +152,7 @@ export default function MemoryPage() {
                     {proposals.map((p) => (
                       <tr key={p.id}>
                         <td>
-                          <code style={{ fontSize: '12px', color: '#6c757d' }}>{p.id.slice(0, 8)}…</code>
+                          <code style={{ fontSize: '12px' }}>{p.id.slice(0, 8)}…</code>
                         </td>
                         <td style={{ fontSize: '13px' }}>{p.memoryUnit?.scopeRef ?? '—'}</td>
                         <td>
@@ -197,34 +162,22 @@ export default function MemoryPage() {
                             {Math.round(p.confidence * 100)}%
                           </span>
                         </td>
-                        <td style={{ color: '#6c757d', fontSize: '13px' }}>
+                        <td style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>
                           {new Date(p.createdAt).toLocaleString()}
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button
                               onClick={() => approve(p.id)}
-                              style={{
-                                background: '#198754',
-                                color: 'white',
-                                border: 'none',
-                                padding: '4px 10px',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                              }}
+                              className="btn-success"
+                              style={{ padding: '4px 10px', fontSize: '13px' }}
                             >
                               Approve
                             </button>
                             <button
                               onClick={() => reject(p.id)}
-                              style={{
-                                background: '#dc3545',
-                                color: 'white',
-                                border: 'none',
-                                padding: '4px 10px',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                              }}
+                              className="btn-danger"
+                              style={{ padding: '4px 10px', fontSize: '13px' }}
                             >
                               Reject
                             </button>
@@ -239,21 +192,11 @@ export default function MemoryPage() {
           )}
 
           <section>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>
-              Memory Units{' '}
-              <span
-                style={{
-                  fontSize: '12px',
-                  background: '#e9ecef',
-                  borderRadius: '10px',
-                  padding: '1px 7px',
-                  marginLeft: '4px',
-                }}
-              >
-                {units.length}
-              </span>
+            <h2 className="section-heading">
+              Memory Units
+              <span className="tab-count">{units.length}</span>
             </h2>
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="table-shell">
               <table>
                 <thead>
                   <tr>
@@ -266,9 +209,7 @@ export default function MemoryPage() {
                 <tbody>
                   {units.length === 0 ? (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', color: '#6c757d', padding: '24px' }}>
-                        No memory units yet.
-                      </td>
+                      <td colSpan={4} className="empty-cell">No memory units yet.</td>
                     </tr>
                   ) : (
                     units.map((u) => (
@@ -276,14 +217,12 @@ export default function MemoryPage() {
                         <td>
                           <code style={{ fontSize: '13px' }}>{u.issue?.jiraIssueKey ?? u.scopeRef}</code>
                         </td>
-                        <td style={{ fontSize: '13px', color: '#6c757d' }}>{u.scopeType}</td>
-                        <td style={{ fontSize: '13px', color: '#6c757d' }}>
+                        <td style={{ fontSize: '13px', color: 'var(--remi-muted)' }}>{u.scopeType}</td>
+                        <td style={{ fontSize: '13px', color: 'var(--remi-muted)' }}>
                           {new Date(u.updatedAt).toLocaleString()}
                         </td>
                         <td>
-                          <Link href={`/memory/${u.id}`} style={{ fontSize: '13px' }}>
-                            View
-                          </Link>
+                          <Link href={`/memory/${u.id}`} style={{ fontSize: '13px' }}>View</Link>
                         </td>
                       </tr>
                     ))

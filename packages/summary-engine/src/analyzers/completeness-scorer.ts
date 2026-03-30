@@ -11,7 +11,6 @@ export interface CompletenessParams {
 }
 
 export function scoreCompleteness(params: CompletenessParams): {
-  score: number;
   recommendedNextStep: string;
   missingSignals: string[];
 } {
@@ -25,54 +24,40 @@ export function scoreCompleteness(params: CompletenessParams): {
     missingHandoff,
   } = params;
 
-  let score = 100;
   const missingSignals: string[] = [];
 
   if (missingOwner) {
-    score -= 20;
     missingSignals.push('No assignee');
   }
 
   if (threads.length === 0) {
-    score -= 15;
     missingSignals.push('No linked Slack threads');
   }
 
-  const blockerPenalty = Math.min(blockers.length * 10, 30);
-  if (blockerPenalty > 0) {
-    score -= blockerPenalty;
+  if (blockers.length > 0) {
     missingSignals.push(`${blockers.length} probable blocker(s) detected`);
   }
 
-  const questionPenalty = Math.min(openQuestions.length * 5, 20);
-  if (questionPenalty > 0) {
-    score -= questionPenalty;
+  if (openQuestions.length > 0) {
     missingSignals.push(`${openQuestions.length} open question(s) unresolved`);
   }
 
   if (statusDriftDetected) {
-    score -= 10;
     missingSignals.push('Status has not changed despite recent Slack activity');
   }
 
   if (missingHandoff) {
-    score -= 15;
     missingSignals.push('Assignee changed recently with no handoff comment');
   }
 
-  // Completion mismatch: status is "done" but open questions exist
   const isDone =
     issue.statusCategory?.toLowerCase() === 'done' ||
     issue.status?.toLowerCase() === 'done';
-  const completionMismatch = isDone && openQuestions.length > 0;
-  if (completionMismatch) {
-    score -= 10;
+  if (isDone && openQuestions.length > 0) {
     missingSignals.push('Issue marked done but open questions remain');
   }
 
-  score = Math.max(0, Math.min(100, score));
-
-  // Determine recommended next step based on highest-impact signal
+  // Recommended next step based on highest-impact signal
   let recommendedNextStep: string;
   if (missingOwner) {
     recommendedNextStep = 'Assign an owner to this issue';
@@ -88,5 +73,5 @@ export function scoreCompleteness(params: CompletenessParams): {
     recommendedNextStep = 'No immediate action required';
   }
 
-  return { score, recommendedNextStep, missingSignals };
+  return { recommendedNextStep, missingSignals };
 }

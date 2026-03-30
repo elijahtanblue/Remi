@@ -22,8 +22,8 @@ const APPS: AppDef[] = [
 ];
 
 const TYPE_COLORS: Record<AppType, { bg: string; text: string }> = {
-  messaging:    { bg: '#e8f4ff', text: '#0066cc' },
-  task_planning: { bg: '#f0f9f0', text: '#1a7a3c' },
+  messaging:    { bg: 'var(--remi-accent-soft)', text: 'var(--remi-navy)' },
+  task_planning: { bg: '#E8F5EE', text: '#1a7a3c' },
 };
 
 const DEFAULT_ROLES = ['CEO', 'VP', 'Director', 'Manager', 'Associate', 'Contractor'];
@@ -36,7 +36,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       onClick={() => onChange(!checked)}
       style={{
         width: '40px', height: '22px', borderRadius: '11px', border: 'none',
-        background: checked ? '#0066cc' : '#dee2e6', position: 'relative',
+        background: checked ? 'var(--remi-navy)' : 'var(--remi-border)', position: 'relative',
         cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 0,
       }}
     >
@@ -55,7 +55,7 @@ function SettingRow({ label, description, children }: {
   return (
     <div style={{
       display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-      gap: '24px', padding: '16px 0', borderBottom: '1px solid #f1f3f5',
+      gap: '24px', padding: '16px 0', borderBottom: '1px solid var(--remi-border)',
     }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: '14px', fontWeight: 500, color: '#212529' }}>{label}</div>
@@ -72,8 +72,8 @@ function SectionCard({ title, children }: { title: string; children: React.React
   return (
     <div className="card" style={{ marginBottom: '20px', padding: '0' }}>
       <div style={{
-        padding: '14px 20px', borderBottom: '1px solid #f1f3f5',
-        background: '#fafbfc', borderRadius: '8px 8px 0 0',
+        padding: '14px 20px', borderBottom: '1px solid var(--remi-border)',
+        background: 'var(--remi-accent-soft)', borderRadius: '8px 8px 0 0',
       }}>
         <span style={{ fontSize: '13px', fontWeight: 600, color: '#495057', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           {title}
@@ -180,7 +180,7 @@ function InfoGatheringSection({ appType }: { appType: AppType }) {
       </SettingRow>
       <SettingRow label="Data retention period" description="How long raw captured data is stored.">
         <select value={retention} onChange={(e) => setRetention(e.target.value)} style={{
-          padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6',
+          padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)',
           borderRadius: '6px', background: '#fff', color: '#212529', cursor: 'pointer',
         }}>
           <option value="30">30 days</option>
@@ -210,22 +210,22 @@ function SlackSettings() {
       <SectionCard title="Rate Limiting">
         <SettingRow label="Max reminders per hour" description="Maximum number of Remi summary notifications sent per channel per hour.">
           <input type="number" min={1} max={20} value={maxReminders} onChange={(e) => setMaxReminders(e.target.value)}
-            style={{ width: '72px', padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6', borderRadius: '6px', textAlign: 'center' }} />
+            style={{ width: '72px', padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)', borderRadius: '6px', textAlign: 'center' }} />
         </SettingRow>
         <SettingRow label="Cooldown between summaries (minutes)" description="Minimum time between consecutive summaries for the same issue.">
           <input type="number" min={5} max={1440} value={cooldown} onChange={(e) => setCooldown(e.target.value)}
-            style={{ width: '72px', padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6', borderRadius: '6px', textAlign: 'center' }} />
+            style={{ width: '72px', padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)', borderRadius: '6px', textAlign: 'center' }} />
         </SettingRow>
       </SectionCard>
 
       <SectionCard title="Access Control">
         <SettingRow label="Minimum role to use /brief" description="Users below this role level cannot request summaries.">
-          <select value={briefRole} onChange={(e) => setBriefRole(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6', borderRadius: '6px', background: '#fff' }}>
+          <select value={briefRole} onChange={(e) => setBriefRole(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)', borderRadius: '6px', background: '#fff' }}>
             {DEFAULT_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </SettingRow>
         <SettingRow label="Minimum role to use /link-ticket" description="Who can link Slack threads to Jira issues.">
-          <select value={linkRole} onChange={(e) => setLinkRole(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6', borderRadius: '6px', background: '#fff' }}>
+          <select value={linkRole} onChange={(e) => setLinkRole(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)', borderRadius: '6px', background: '#fff' }}>
             {DEFAULT_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </SettingRow>
@@ -240,9 +240,9 @@ function SlackSettings() {
             {(['thread', 'dm'] as const).map((v) => (
               <button key={v} onClick={() => setSummaryDelivery(v)} style={{
                 padding: '6px 14px', fontSize: '13px', borderRadius: '6px', border: '1px solid',
-                borderColor: summaryDelivery === v ? '#0066cc' : '#dee2e6',
-                background: summaryDelivery === v ? '#e8f4ff' : '#fff',
-                color: summaryDelivery === v ? '#0066cc' : '#6c757d',
+                borderColor: summaryDelivery === v ? 'var(--remi-navy)' : 'var(--remi-border)',
+                background: summaryDelivery === v ? 'var(--remi-accent-soft)' : 'var(--remi-surface)',
+                color: summaryDelivery === v ? 'var(--remi-navy)' : 'var(--remi-muted)',
                 fontWeight: summaryDelivery === v ? 600 : 400, cursor: 'pointer',
               }}>
                 {v === 'thread' ? 'In-thread' : 'Direct message'}
@@ -283,7 +283,7 @@ function JiraSettings() {
     <>
       <SectionCard title="Sync Configuration">
         <SettingRow label="Sync frequency" description="How often Remi polls Jira for updates. Realtime uses webhooks.">
-          <select value={syncFrequency} onChange={(e) => setSyncFrequency(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6', borderRadius: '6px', background: '#fff' }}>
+          <select value={syncFrequency} onChange={(e) => setSyncFrequency(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)', borderRadius: '6px', background: '#fff' }}>
             <option value="realtime">Realtime (webhooks)</option>
             <option value="5">Every 5 minutes</option>
             <option value="15">Every 15 minutes</option>
@@ -297,8 +297,8 @@ function JiraSettings() {
               return (
                 <button key={t} onClick={() => toggleIssueType(t)} style={{
                   padding: '4px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: 500,
-                  border: '1px solid', borderColor: active ? '#0066cc' : '#dee2e6',
-                  background: active ? '#e8f4ff' : '#fff', color: active ? '#0066cc' : '#6c757d', cursor: 'pointer',
+                  border: '1px solid', borderColor: active ? 'var(--remi-navy)' : 'var(--remi-border)',
+                  background: active ? 'var(--remi-accent-soft)' : 'var(--remi-surface)', color: active ? 'var(--remi-navy)' : 'var(--remi-muted)', cursor: 'pointer',
                 }}>
                   {t}
                 </button>
@@ -339,7 +339,7 @@ function JiraSettings() {
             placeholder="e.g. INFRA, SEC"
             value={adminProjects.join(', ')}
             onChange={(e) => setAdminProjects(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
-            style={{ width: '200px', padding: '6px 10px', fontSize: '13px', border: '1px solid #dee2e6', borderRadius: '6px' }}
+            style={{ width: '200px', padding: '6px 10px', fontSize: '13px', border: '1px solid var(--remi-border)', borderRadius: '6px' }}
           />
         </SettingRow>
       </SectionCard>
@@ -351,17 +351,18 @@ function JiraSettings() {
 
 function NotConnectedBanner({ appName, onConnect }: { appName: string; onConnect: () => void }) {
   return (
-    <div className="card" style={{ textAlign: 'center', padding: '48px 32px', background: '#fafbfc' }}>
+    <div className="card" style={{ textAlign: 'center', padding: '48px 32px', background: 'var(--remi-accent-soft)' }}>
       <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔌</div>
-      <div style={{ fontSize: '17px', fontWeight: 600, marginBottom: '8px', color: '#212529' }}>
+      <div style={{ fontSize: '17px', fontWeight: 600, marginBottom: '8px', color: 'var(--remi-ink)' }}>
         {appName} is not connected
       </div>
-      <div style={{ fontSize: '14px', color: '#6c757d', marginBottom: '24px', maxWidth: '380px', margin: '0 auto 24px' }}>
+      <div style={{ fontSize: '14px', color: 'var(--remi-muted)', marginBottom: '24px', maxWidth: '380px', margin: '0 auto 24px' }}>
         Connect your {appName} account to start scanning emails for blockers, stalled threads, and cross-team dependencies.
       </div>
       <button
         onClick={onConnect}
-        style={{ padding: '10px 24px', fontSize: '14px', fontWeight: 600, borderRadius: '6px', border: 'none', background: '#0066cc', color: '#fff', cursor: 'pointer' }}
+        className="btn-primary"
+        style={{ padding: '10px 24px', fontSize: '14px', borderRadius: '6px', cursor: 'pointer' }}
       >
         Connect {appName}
       </button>
@@ -427,7 +428,7 @@ export default function IntegrationsClient() {
       </div>
 
       {/* App tabs */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #dee2e6', marginBottom: '28px', flexWrap: 'wrap' }}>
+      <div className="tab-strip" style={{ marginBottom: '28px' }}>
         {apps.map((a) => {
           const isActive = a.id === activeApp;
           const c = TYPE_COLORS[a.type];
@@ -435,13 +436,8 @@ export default function IntegrationsClient() {
             <button
               key={a.id}
               onClick={() => setActiveApp(a.id)}
-              style={{
-                padding: '10px 20px', fontSize: '14px', fontWeight: isActive ? 600 : 400,
-                color: isActive ? '#212529' : '#6c757d', background: 'none', border: 'none',
-                borderBottom: isActive ? '2px solid #212529' : '2px solid transparent',
-                marginBottom: '-2px', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                gap: '8px', transition: 'color 0.1s',
-              }}
+              className={`tab-btn${isActive ? ' active' : ''}`}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               {a.name}
               <span style={{ fontSize: '11px', fontWeight: 500, padding: '2px 8px', borderRadius: '10px', background: c.bg, color: c.text }}>
@@ -449,7 +445,7 @@ export default function IntegrationsClient() {
               </span>
               <span style={{
                 width: '7px', height: '7px', borderRadius: '50%', display: 'inline-block',
-                background: a.connected ? '#28a745' : '#adb5bd',
+                background: a.connected ? '#059669' : '#adb5bd',
               }} />
             </button>
           );
@@ -461,8 +457,8 @@ export default function IntegrationsClient() {
       {/* Save bar — only show when connected */}
       {app.connected && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px', paddingTop: '8px' }}>
-          {saved && <span style={{ fontSize: '13px', color: '#28a745', fontWeight: 500 }}>Settings saved</span>}
-          <button onClick={handleSave} style={{ padding: '9px 24px', fontSize: '14px', fontWeight: 600, background: '#0066cc', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+          {saved && <span style={{ fontSize: '13px', color: '#059669', fontWeight: 500 }}>Settings saved</span>}
+          <button onClick={handleSave} className="btn-primary" style={{ padding: '9px 24px', fontSize: '14px', borderRadius: '6px', cursor: 'pointer' }}>
             Save changes
           </button>
         </div>

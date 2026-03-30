@@ -19,8 +19,8 @@ function makeIssue(overrides: Partial<IssueSnapshot> = {}): IssueSnapshot {
 const emptyThread: ThreadData = { id: 't1', channelId: 'C-x', messages: [] };
 
 describe('scoreCompleteness', () => {
-  it('returns score 100 for a fully complete issue', () => {
-    const { score } = scoreCompleteness({
+  it('returns no missing signals for a healthy issue', () => {
+    const { missingSignals } = scoreCompleteness({
       issue: makeIssue(),
       threads: [emptyThread],
       blockers: [],
@@ -29,11 +29,11 @@ describe('scoreCompleteness', () => {
       missingOwner: false,
       missingHandoff: false,
     });
-    expect(score).toBe(100);
+    expect(missingSignals).toHaveLength(0);
   });
 
-  it('deducts 20 for missing owner', () => {
-    const { score, missingSignals } = scoreCompleteness({
+  it('flags missing owner', () => {
+    const { missingSignals } = scoreCompleteness({
       issue: makeIssue({ assigneeJiraAccountId: null }),
       threads: [emptyThread],
       blockers: [],
@@ -42,12 +42,11 @@ describe('scoreCompleteness', () => {
       missingOwner: true,
       missingHandoff: false,
     });
-    expect(score).toBe(80);
     expect(missingSignals).toContain('No assignee');
   });
 
-  it('deducts 15 for no linked Slack threads', () => {
-    const { score, missingSignals } = scoreCompleteness({
+  it('flags no linked Slack threads', () => {
+    const { missingSignals } = scoreCompleteness({
       issue: makeIssue(),
       threads: [],
       blockers: [],
@@ -56,51 +55,24 @@ describe('scoreCompleteness', () => {
       missingOwner: false,
       missingHandoff: false,
     });
-    expect(score).toBe(85);
     expect(missingSignals).toContain('No linked Slack threads');
   });
 
-  it('deducts 10 per blocker (capped at 30)', () => {
-    const { score } = scoreCompleteness({
+  it('flags probable blockers', () => {
+    const { missingSignals } = scoreCompleteness({
       issue: makeIssue(),
       threads: [emptyThread],
-      blockers: ['b1', 'b2', 'b3'],
+      blockers: ['b1', 'b2'],
       openQuestions: [],
       statusDriftDetected: false,
       missingOwner: false,
       missingHandoff: false,
     });
-    expect(score).toBe(70); // 100 - 30
+    expect(missingSignals).toContain('2 probable blocker(s) detected');
   });
 
-  it('blocker penalty never exceeds 30', () => {
-    const { score } = scoreCompleteness({
-      issue: makeIssue(),
-      threads: [emptyThread],
-      blockers: ['b1', 'b2', 'b3', 'b4', 'b5'],
-      openQuestions: [],
-      statusDriftDetected: false,
-      missingOwner: false,
-      missingHandoff: false,
-    });
-    expect(score).toBe(70); // still capped at -30
-  });
-
-  it('deducts 5 per open question (capped at 20)', () => {
-    const { score } = scoreCompleteness({
-      issue: makeIssue(),
-      threads: [emptyThread],
-      blockers: [],
-      openQuestions: ['q1', 'q2', 'q3', 'q4', 'q5'],
-      statusDriftDetected: false,
-      missingOwner: false,
-      missingHandoff: false,
-    });
-    expect(score).toBe(80); // 100 - 20 (capped)
-  });
-
-  it('deducts 10 for status drift', () => {
-    const { score, missingSignals } = scoreCompleteness({
+  it('flags status drift', () => {
+    const { missingSignals } = scoreCompleteness({
       issue: makeIssue(),
       threads: [emptyThread],
       blockers: [],
@@ -109,12 +81,11 @@ describe('scoreCompleteness', () => {
       missingOwner: false,
       missingHandoff: false,
     });
-    expect(score).toBe(90);
     expect(missingSignals).toContain('Status has not changed despite recent Slack activity');
   });
 
-  it('deducts 15 for missing handoff', () => {
-    const { score, missingSignals } = scoreCompleteness({
+  it('flags missing handoff', () => {
+    const { missingSignals } = scoreCompleteness({
       issue: makeIssue(),
       threads: [emptyThread],
       blockers: [],
@@ -123,12 +94,11 @@ describe('scoreCompleteness', () => {
       missingOwner: false,
       missingHandoff: true,
     });
-    expect(score).toBe(85);
     expect(missingSignals).toContain('Assignee changed recently with no handoff comment');
   });
 
-  it('deducts 10 for completion mismatch (done + open questions)', () => {
-    const { score, missingSignals } = scoreCompleteness({
+  it('flags completion mismatch (done + open questions)', () => {
+    const { missingSignals } = scoreCompleteness({
       issue: makeIssue({ status: 'Done', statusCategory: 'done' }),
       threads: [emptyThread],
       blockers: [],
@@ -137,22 +107,7 @@ describe('scoreCompleteness', () => {
       missingOwner: false,
       missingHandoff: false,
     });
-    // -5 for 1 open question, -10 for completion mismatch
-    expect(score).toBe(85);
     expect(missingSignals).toContain('Issue marked done but open questions remain');
-  });
-
-  it('score never goes below 0', () => {
-    const { score } = scoreCompleteness({
-      issue: makeIssue({ assigneeJiraAccountId: null }),
-      threads: [],
-      blockers: ['b1', 'b2', 'b3'],
-      openQuestions: ['q1', 'q2', 'q3', 'q4'],
-      statusDriftDetected: true,
-      missingOwner: true,
-      missingHandoff: true,
-    });
-    expect(score).toBeGreaterThanOrEqual(0);
   });
 
   describe('recommendedNextStep', () => {
