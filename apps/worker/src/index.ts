@@ -7,6 +7,8 @@ import { handleSlackEvent } from './handlers/slack-events.js';
 import { handleSummaryJob } from './handlers/summary-jobs.js';
 import { handleBackfillJob } from './handlers/backfill-jobs.js';
 import type { JiraEventMessage, SlackEventMessage, SummaryJobMessage, BackfillJobMessage } from '@remi/shared';
+import type { MemoryExtractMessage, MemorySnapshotMessage, MemoryWritebackProposeMessage, MemoryWritebackApplyMessage } from '@remi/shared';
+import { handleMemoryExtract, handleMemorySnapshot, handleMemoryWritebackPropose, handleMemoryWritebackApply } from './handlers/memory-jobs.js';
 import { syncAllGmailWorkspaces } from '@remi/gmail';
 
 const queue =
@@ -18,6 +20,10 @@ const queue =
           [QueueNames.JIRA_EVENTS]: config.SQS_JIRA_EVENTS_URL ?? '',
           [QueueNames.SUMMARY_JOBS]: config.SQS_SUMMARY_JOBS_URL ?? '',
           [QueueNames.BACKFILL_JOBS]: config.SQS_BACKFILL_JOBS_URL ?? '',
+          [QueueNames.MEMORY_EXTRACT]: config.SQS_MEMORY_EXTRACT_URL ?? '',
+          [QueueNames.MEMORY_SNAPSHOT]: config.SQS_MEMORY_SNAPSHOT_URL ?? '',
+          [QueueNames.MEMORY_WRITEBACK_PROPOSE]: config.SQS_MEMORY_WRITEBACK_PROPOSE_URL ?? '',
+          [QueueNames.MEMORY_WRITEBACK_APPLY]: config.SQS_MEMORY_WRITEBACK_APPLY_URL ?? '',
         },
       })
     : new MemoryQueueAdapter();
@@ -36,6 +42,19 @@ startConsumer(queue, QueueNames.SUMMARY_JOBS, (msg) =>
 
 startConsumer(queue, QueueNames.BACKFILL_JOBS, (msg) =>
   handleBackfillJob(msg as BackfillJobMessage, queue),
+);
+
+startConsumer(queue, QueueNames.MEMORY_EXTRACT, (msg) =>
+  handleMemoryExtract(msg as MemoryExtractMessage),
+);
+startConsumer(queue, QueueNames.MEMORY_SNAPSHOT, (msg) =>
+  handleMemorySnapshot(msg as MemorySnapshotMessage, queue),
+);
+startConsumer(queue, QueueNames.MEMORY_WRITEBACK_PROPOSE, (msg) =>
+  handleMemoryWritebackPropose(msg as MemoryWritebackProposeMessage, queue),
+);
+startConsumer(queue, QueueNames.MEMORY_WRITEBACK_APPLY, (msg) =>
+  handleMemoryWritebackApply(msg as MemoryWritebackApplyMessage),
 );
 
 console.log(`[worker] Started consuming queues: ${Object.values(QueueNames).join(', ')}`);
