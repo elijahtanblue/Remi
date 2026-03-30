@@ -30,6 +30,16 @@ export async function memoryRoutes(app: FastifyInstance, { queue }: { queue: IQu
     }
   );
 
+  // GET /admin/memory/units/by-id/:unitId  (registered before /:workspaceId to avoid route conflict)
+  app.get<{ Params: { unitId: string } }>(
+    '/units/by-id/:unitId', async (req, reply) => {
+      const unit = await getMemoryUnit(prisma, req.params.unitId);
+      if (!unit) return reply.status(404).send({ error: 'Not found' });
+      const snapshots = await listSnapshots(prisma, req.params.unitId);
+      return reply.send({ unit, snapshots });
+    }
+  );
+
   // GET /admin/memory/units/:workspaceId
   app.get<{ Params: { workspaceId: string }; Querystring: { limit?: number; offset?: number } }>(
     '/units/:workspaceId', async (req, reply) => {

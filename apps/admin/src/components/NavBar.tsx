@@ -10,6 +10,8 @@ const links = [
   { href: '/summaries', label: 'Summaries' },
   { href: '/dead-letters', label: 'Dead Letters' },
   { href: '/audit-log', label: 'Audit Log' },
+  { href: '/analytics', label: 'Analytics' },
+  { href: '/memory', label: 'Memory' },
 ];
 
 export default function NavBar() {
