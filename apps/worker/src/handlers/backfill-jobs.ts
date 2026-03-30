@@ -1,9 +1,7 @@
 import {
   prisma,
   createIssueEvent,
-  findIssueEventByIdempotencyKey,
   createSlackMessage,
-  findSlackMessageByIdempotencyKey,
   upsertIssue,
   PrismaClient as _PrismaClient,
   Prisma,
@@ -14,6 +12,7 @@ import type { IQueueProducer } from '@remi/queue';
 import { JiraClient } from '@remi/jira';
 import { WebClient } from '@slack/web-api';
 import { v4 as uuidv4 } from 'uuid';
+import { config } from '../config.js';
 
 export async function handleBackfillJob(
   message: BackfillJobMessage,
@@ -56,40 +55,84 @@ async function handleJiraIssueBackfill(
   // JiraClient constructor: (baseUrl, clientKey, sharedSecret)
   const jiraClient = new JiraClient(install.jiraSiteUrl, install.jiraClientKey, install.sharedSecret);
 
-  // Fetch changelog and create IssueEvent for each entry
-  const changelog = await jiraClient.getIssueChangelog(issue.jiraIssueKey);
-  for (const entry of changelog) {
-    const idempotencyKey = `jira:changelog:${issue.jiraIssueId}:${entry.created}`;
-    const exists = await findIssueEventByIdempotencyKey(prisma, idempotencyKey);
-    if (exists) continue;
-
-    await createIssueEvent(prisma, {
-      issueId: issue.id,
-      idempotencyKey,
-      eventType: 'changelog_entry',
-      source: 'jira_backfill',
-      rawPayload: entry as unknown as Record<string, unknown>,
-      occurredAt: new Date(entry.created),
-    });
-  }
-
-  // Update the existing Issue row by id — avoids a duplicate row when jiraSiteUrl
-  // was 'pending' (placeholder created at link time) and the real URL differs.
+  // Always fetch real issue data first — this is the critical path
   const freshIssue = await jiraClient.getIssue(issue.jiraIssueKey);
+  const nextAssigneeJiraAccountId = freshIssue.assignee?.accountId ?? null;
+  const nextAssigneeDisplayName =
+    nextAssigneeJiraAccountId === null
+      ? null
+      : freshIssue.assignee?.displayName ??
+        (issue.assigneeJiraAccountId === nextAssigneeJiraAccountId ? issue.assigneeDisplayName : null);
+  const canonicalJiraIssueId = freshIssue.id ?? issue.jiraIssueId;
   await prisma.issue.update({
     where: { id: issue.id },
     data: {
-      jiraIssueId: freshIssue.id ?? issue.jiraIssueId,
+      jiraIssueId: canonicalJiraIssueId,
       jiraSiteUrl: install.jiraSiteUrl,
       title: freshIssue.summary,
       status: freshIssue.status.name,
       statusCategory: freshIssue.status.statusCategory.key,
-      assigneeJiraAccountId: freshIssue.assignee?.accountId ?? null,
+      assigneeJiraAccountId: nextAssigneeJiraAccountId,
+      assigneeDisplayName: nextAssigneeDisplayName,
       priority: freshIssue.priority?.name ?? null,
       issueType: freshIssue.issuetype.name,
       rawPayload: freshIssue as unknown as Prisma.InputJsonValue,
     },
   });
+
+  // Fetch changelog and create IssueEvent for each entry — non-fatal.
+  // Event types must match what the status-analyzer expects: status_changed,
+  // assignee_changed, priority_changed (mirrors the derivation in jira-events.ts).
+  try {
+    const changelog = await jiraClient.getIssueChangelog(issue.jiraIssueKey);
+
+    // Batch-fetch all existing idempotency keys for this issue in one query
+    // to avoid N+1 lookups in the loop below.
+    const existingEvents = await prisma.issueEvent.findMany({
+      where: { issueId: issue.id, source: 'jira_backfill' },
+      select: { idempotencyKey: true },
+    });
+    const existingKeys = new Set(existingEvents.map((e) => e.idempotencyKey));
+
+    for (const entry of changelog) {
+      const idempotencyKey = `jira:changelog:${canonicalJiraIssueId}:${entry.created}`;
+      if (existingKeys.has(idempotencyKey)) continue;
+
+      // Derive the primary event type from the changed fields (same precedence as jira-events.ts)
+      const fieldNames = entry.items.map((item) => item.field.toLowerCase());
+      let derivedEventType = 'changelog_entry';
+      let primaryField: string | null = null;
+      if (fieldNames.includes('status')) {
+        derivedEventType = 'status_changed';
+        primaryField = 'status';
+      } else if (fieldNames.includes('assignee')) {
+        derivedEventType = 'assignee_changed';
+        primaryField = 'assignee';
+      } else if (fieldNames.includes('priority')) {
+        derivedEventType = 'priority_changed';
+        primaryField = 'priority';
+      }
+
+      // Store flat { from, to } for typed events so the status-analyzer can read them
+      let changedFields: Record<string, unknown> = entry as unknown as Record<string, unknown>;
+      if (primaryField) {
+        const item = entry.items.find((i) => i.field.toLowerCase() === primaryField);
+        changedFields = { from: item?.fromString ?? null, to: item?.toString ?? null };
+      }
+
+      await createIssueEvent(prisma, {
+        issueId: issue.id,
+        idempotencyKey,
+        eventType: derivedEventType,
+        source: 'jira_backfill',
+        changedFields,
+        rawPayload: entry as unknown as Record<string, unknown>,
+        occurredAt: new Date(entry.created),
+      });
+    }
+  } catch (err) {
+    console.warn(`[backfill-jobs] Changelog fetch failed for ${issue.jiraIssueKey}, skipping:`, err);
+  }
 
   // Enqueue summary after backfill
   const summaryIdempotencyKey = `summary:backfill:${issue.id}:${Date.now()}`;
@@ -134,17 +177,58 @@ async function handleSlackThreadBackfill(
 
   const slackClient = new WebClient(slackInstall.botToken);
 
-  const repliesResult = await slackClient.conversations.replies({
-    channel: thread.channelId,
-    ts: thread.threadTs,
-  });
+  // Fetch messages: paginated history for channel-level links, replies for thread-level.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let slackMessages: any[] = [];
+  try {
+    if (thread.isChannelLevel) {
+      // Paginate through history up to SLACK_BACKFILL_LIMIT messages
+      let cursor: string | undefined;
+      let fetched = 0;
+      const limit = config.SLACK_BACKFILL_LIMIT;
+      do {
+        const pageSize = Math.min(200, limit - fetched);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const historyResult = await (slackClient.conversations.history as any)({
+          channel: thread.channelId,
+          limit: pageSize,
+          ...(cursor ? { cursor } : {}),
+        });
+        slackMessages = slackMessages.concat(historyResult.messages ?? []);
+        fetched += (historyResult.messages ?? []).length;
+        cursor = historyResult.response_metadata?.next_cursor;
+      } while (cursor && fetched < config.SLACK_BACKFILL_LIMIT);
+    } else {
+      const repliesResult = await slackClient.conversations.replies({
+        channel: thread.channelId,
+        ts: thread.threadTs,
+      });
+      slackMessages = repliesResult.messages ?? [];
+    }
+  } catch (err: unknown) {
+    const slackError = (err as { data?: { error?: string } }).data?.error;
+    if (slackError === 'not_in_channel' || slackError === 'channel_not_found') {
+      console.warn(
+        `[backfill-jobs] Slack ${slackError} for channel ${thread.channelId} — bot not in channel, skipping thread backfill`,
+      );
+      return;
+    }
+    throw err;
+  }
 
-  for (const msg of repliesResult.messages ?? []) {
+  // Batch-fetch existing idempotency keys for this thread in one query
+  // to avoid N+1 lookups in the loop below.
+  const existingMessages = await prisma.slackMessage.findMany({
+    where: { threadId: thread.id },
+    select: { idempotencyKey: true },
+  });
+  const existingMessageKeys = new Set(existingMessages.map((m) => m.idempotencyKey));
+
+  for (const msg of slackMessages) {
     if (!msg.ts) continue;
 
     const idempotencyKey = `slack:backfill:${thread.slackTeamId}:${thread.channelId}:${msg.ts}`;
-    const exists = await findSlackMessageByIdempotencyKey(prisma, idempotencyKey);
-    if (exists) continue;
+    if (existingMessageKeys.has(idempotencyKey)) continue;
 
     await createSlackMessage(prisma, {
       threadId: thread.id,

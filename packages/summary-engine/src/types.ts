@@ -5,6 +5,7 @@ export interface IssueSnapshot {
   status: string | null;
   statusCategory: string | null;
   assigneeJiraAccountId: string | null;
+  assigneeDisplayName: string | null;
   priority: string | null;
   updatedAt: Date;
 }

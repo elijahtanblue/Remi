@@ -45,7 +45,7 @@ export function formatSummary(
     issueKey: issue.jiraIssueKey,
     issueTitle: issue.title,
     currentStatus: issue.status ?? 'Unknown',
-    assignee: issue.assigneeJiraAccountId,
+    assignee: issue.assigneeDisplayName ?? issue.assigneeJiraAccountId ?? null,
     previousAssignee: analysis.previousAssignee,
     latestImportantChanges,
     linkedThreadStats: {

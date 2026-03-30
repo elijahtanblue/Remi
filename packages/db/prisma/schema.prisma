@@ -140,6 +140,7 @@ model Issue {
   status                 String?
   statusCategory         String?
   assigneeJiraAccountId  String?
+  assigneeDisplayName    String?
   priority               String?
   issueType              String?
   rawPayload             Json?
@@ -183,15 +184,16 @@ model IssueEvent {
 // ─── Slack Threads & Messages ────────────────────────────────────────────────
 
 model SlackThread {
-  id          String   @id @default(cuid())
-  workspaceId String
-  slackTeamId String
-  channelId   String
-  threadTs    String
-  channelName String?
-  permalink   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  workspaceId    String
+  slackTeamId    String
+  channelId      String
+  threadTs       String
+  isChannelLevel Boolean  @default(false)
+  channelName    String?
+  permalink      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   workspace  Workspace         @relation(fields: [workspaceId], references: [id])
   messages   SlackMessage[]

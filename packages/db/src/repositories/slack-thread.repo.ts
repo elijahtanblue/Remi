@@ -7,11 +7,12 @@ export async function upsertSlackThread(
     slackTeamId: string;
     channelId: string;
     threadTs: string;
+    isChannelLevel?: boolean;
     channelName?: string;
     permalink?: string;
   },
 ) {
-  const { workspaceId, slackTeamId, channelId, threadTs, channelName, permalink } = data;
+  const { workspaceId, slackTeamId, channelId, threadTs, isChannelLevel = false, channelName, permalink } = data;
   return prisma.slackThread.upsert({
     where: {
       slackTeamId_channelId_threadTs: { slackTeamId, channelId, threadTs },
@@ -25,6 +26,7 @@ export async function upsertSlackThread(
       slackTeamId,
       channelId,
       threadTs,
+      isChannelLevel,
       channelName,
       permalink,
     },

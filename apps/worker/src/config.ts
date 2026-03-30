@@ -12,6 +12,7 @@ const schema = z.object({
   SLACK_BOT_TOKEN: z.string().optional(),
   MAX_RETRY_COUNT: z.coerce.number().default(3),
   GMAIL_SYNC_ENABLED: z.coerce.boolean().default(true),
+  SLACK_BACKFILL_LIMIT: z.coerce.number().default(500),
 });
 
 export const config = schema.parse(process.env);

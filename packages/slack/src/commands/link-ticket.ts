@@ -94,6 +94,7 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         slackTeamId: teamId,
         channelId: command.channel_id,
         threadTs,
+        isChannelLevel,
       });
 
       // 7. Upsert placeholder Issue — include Slack-specified assignee if provided

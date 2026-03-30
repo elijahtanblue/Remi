@@ -34,7 +34,8 @@ export async function upsertIssue(
     title: string;
     status?: string;
     statusCategory?: string;
-    assigneeJiraAccountId?: string;
+    assigneeJiraAccountId?: string | null;
+    assigneeDisplayName?: string | null;
     priority?: string;
     issueType?: string;
     rawPayload?: Record<string, unknown>;
@@ -50,6 +51,7 @@ export async function upsertIssue(
     status,
     statusCategory,
     assigneeJiraAccountId,
+    assigneeDisplayName,
     priority,
     issueType,
     rawPayload,
@@ -67,6 +69,7 @@ export async function upsertIssue(
       status,
       statusCategory,
       assigneeJiraAccountId,
+      assigneeDisplayName,
       priority,
       issueType,
       rawPayload: jsonPayload,
@@ -81,6 +84,7 @@ export async function upsertIssue(
       status,
       statusCategory,
       assigneeJiraAccountId,
+      assigneeDisplayName,
       priority,
       issueType,
       rawPayload: jsonPayload,

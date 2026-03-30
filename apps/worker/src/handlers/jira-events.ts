@@ -40,12 +40,16 @@ export async function handleJiraEvent(
   const fields = rawIssue?.fields as Record<string, unknown> | undefined;
 
   const statusField = fields?.status as Record<string, unknown> | undefined;
-  const assigneeField = fields?.assignee as Record<string, unknown> | undefined;
+  const assigneeField = fields?.assignee as Record<string, unknown> | null | undefined;
   const priorityField = fields?.priority as Record<string, unknown> | undefined;
   const issueTypeField = fields?.issuetype as Record<string, unknown> | undefined;
   const statusCategoryField = statusField?.statusCategory as
     | Record<string, unknown>
     | undefined;
+  const assigneeJiraAccountId =
+    assigneeField === undefined ? undefined : (assigneeField?.accountId as string | undefined) ?? null;
+  const assigneeDisplayName =
+    assigneeField === undefined ? undefined : (assigneeField?.displayName as string | undefined) ?? null;
 
   // 4. Upsert Issue with correct field names
   const issue = await upsertIssue(prisma, {
@@ -56,7 +60,8 @@ export async function handleJiraEvent(
     title: (fields?.summary as string | undefined) ?? payload.issueKey,
     status: statusField?.name as string | undefined,
     statusCategory: statusCategoryField?.key as string | undefined,
-    assigneeJiraAccountId: assigneeField?.accountId as string | undefined,
+    assigneeJiraAccountId,
+    assigneeDisplayName,
     priority: priorityField?.name as string | undefined,
     issueType: issueTypeField?.name as string | undefined,
     rawPayload: rawIssue ?? {},

@@ -14,6 +14,7 @@ export async function collectIssueData(
     status: raw.status ?? null,
     statusCategory: raw.statusCategory ?? null,
     assigneeJiraAccountId: raw.assigneeJiraAccountId ?? null,
+    assigneeDisplayName: raw.assigneeDisplayName ?? null,
     priority: raw.priority ?? null,
     updatedAt: raw.updatedAt,
   };
