@@ -16,6 +16,10 @@ export const QueueNames = {
   SUMMARY_JOBS: "summary-jobs",
   BACKFILL_JOBS: "backfill-jobs",
   DEAD_LETTER: "dead-letter",
+  MEMORY_EXTRACT: "memory-extract",
+  MEMORY_SNAPSHOT: "memory-snapshot",
+  MEMORY_WRITEBACK_PROPOSE: "memory-writeback-propose",
+  MEMORY_WRITEBACK_APPLY: "memory-writeback-apply",
 } as const;
 
 export type QueueName = (typeof QueueNames)[keyof typeof QueueNames];
