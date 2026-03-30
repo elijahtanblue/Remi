@@ -1,5 +1,5 @@
 import type { App } from '@slack/bolt';
-import { prisma } from '@remi/db';
+import { prisma, createProductEvent, getMemoryConfig, listMemoryUnits, listPendingProposals } from '@remi/db';
 
 export function registerAppHome(app: App): void {
   app.event('app_home_opened', async ({ event, client, context, logger }) => {
@@ -7,6 +7,12 @@ export function registerAppHome(app: App): void {
     const userId = event.user;
 
     try {
+      void createProductEvent(prisma, {
+        workspaceId,
+        event: 'app_home_opened',
+        actorId: userId,
+      });
+
       // Query last 10 active IssueThreadLinks for this workspace, including issue data
       const recentLinks = await prisma.issueThreadLink.findMany({
         where: {
@@ -37,6 +43,14 @@ export function registerAppHome(app: App): void {
           },
         },
       });
+
+      const memConfig = await getMemoryConfig(prisma, workspaceId);
+      const memoryUnits = memConfig?.enabled
+        ? await listMemoryUnits(prisma, workspaceId, { limit: 5 })
+        : [];
+      const pendingProposals = memConfig?.enabled
+        ? await listPendingProposals(prisma, workspaceId)
+        : [];
 
       // Build linked issues section blocks
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,6 +109,22 @@ export function registerAppHome(app: App): void {
             },
           ];
 
+      const memoryBlocks: unknown[] = memConfig?.enabled
+        ? [
+            { type: 'divider' },
+            { type: 'section', text: { type: 'mrkdwn', text: '*Autonomous Memory*' } },
+            ...(memoryUnits.length > 0
+              ? memoryUnits.map((u) => ({
+                  type: 'section',
+                  text: { type: 'mrkdwn', text: `${u.scopeType === 'issue_thread' ? '🧵' : '💬'} ${(u as any).issue?.jiraIssueKey ?? u.scopeRef} · Updated ${new Date(u.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` },
+                }))
+              : [{ type: 'section', text: { type: 'mrkdwn', text: '_No memory units yet. Link a thread to a Jira issue to get started._' } }]),
+            ...(pendingProposals.length > 0
+              ? [{ type: 'section', text: { type: 'mrkdwn', text: `⏳ *${pendingProposals.length} pending Jira writeback ${pendingProposals.length === 1 ? 'proposal' : 'proposals'} awaiting approval*` } }]
+              : []),
+          ]
+        : [];
+
       await client.views.publish({
         user_id: userId,
         view: {
@@ -131,6 +161,7 @@ export function registerAppHome(app: App): void {
               },
             },
             ...summaryBlocks,
+            ...memoryBlocks,
             { type: 'divider' },
 
             // Footer
