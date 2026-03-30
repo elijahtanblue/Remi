@@ -2,3 +2,7 @@ export * from './models.js';
 export * from './clients/interface.js';
 export * from './clients/gemini.js';
 export * from './clients/openai.js';
+export * from './pipeline/stage1-extract.js';
+export * from './pipeline/stage2-snapshot.js';
+export * from './pipeline/stage3-propose.js';
+export * from './pipeline/run.js';
