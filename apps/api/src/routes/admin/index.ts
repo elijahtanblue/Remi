@@ -13,14 +13,18 @@ import {
   findIssueById,
   upsertGmailInstall,
   findGmailInstall,
+  getProductEventCounts,
 } from '@remi/db';
 import { queue } from '../../queue.js';
 import { config } from '../../config.js';
 import { QueueNames } from '@remi/shared';
 import { v4 as uuidv4 } from 'uuid';
 import { validateGmailConfigBody } from './gmail-config.js';
+import { memoryRoutes } from './memory.js';
 
 export async function adminRoutes(app: FastifyInstance) {
+  await app.register(memoryRoutes, { prefix: '/memory', queue });
+
   // Auth hook — all /admin/* routes require the X-Admin-Key header
   app.addHook('onRequest', async (request, reply) => {
     const key = request.headers['x-admin-key'];
@@ -185,6 +189,24 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!install) return reply.code(404).send({ error: 'Gmail not configured for this workspace' });
     const { serviceAccountJson: _sa, ...safeInstall } = install;
     return { install: safeInstall };
+  });
+
+  // GET /admin/analytics
+  // Query params: since (days, default 30), workspaceId (optional)
+  app.get('/analytics', async (request) => {
+    const { since = '30', workspaceId } = request.query as {
+      since?: string;
+      workspaceId?: string;
+    };
+    const sinceDays = Math.max(1, Math.min(365, Number(since) || 30));
+    const sinceDate = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+
+    const counts = await getProductEventCounts(prisma, {
+      workspaceId: workspaceId ?? null,
+      since: sinceDate,
+    });
+
+    return { since: sinceDate.toISOString(), sinceDays, workspaceId: workspaceId ?? null, counts };
   });
 
   // GET /admin/workspaces/:workspaceId/audit-log
