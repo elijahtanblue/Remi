@@ -3,6 +3,8 @@ import {
   createSlackMessage,
   findSlackThreadByTs,
   findLinksByThreadId,
+  getMemoryConfig,
+  findOrCreateMemoryUnit,
 } from '@remi/db';
 import type { SlackEventMessage } from '@remi/shared';
 import { QueueNames, TriggerReason } from '@remi/shared';
@@ -73,6 +75,29 @@ export async function handleSlackEvent(
         triggerReason: TriggerReason.SLACK_ACTIVITY,
       },
     });
+  }
+
+  // ── Memory ingestion trigger ──────────────────────────────────────────────
+  const memoryConfig = await getMemoryConfig(prisma, message.workspaceId);
+  if (memoryConfig?.enabled) {
+    const threadLinks = await prisma.issueThreadLink.findMany({
+      where: { threadId: thread.id, unlinkedAt: null },
+      include: { issue: true },
+    });
+
+    for (const link of threadLinks) {
+      const { unit } = await findOrCreateMemoryUnit(
+        prisma, message.workspaceId, 'issue_thread', thread.id, link.issueId,
+      );
+      await queue.send(QueueNames.MEMORY_EXTRACT, {
+        id: uuidv4(),
+        idempotencyKey: `memory-extract-${slackMessage.id}`,
+        workspaceId: message.workspaceId,
+        timestamp: new Date().toISOString(),
+        type: 'memory_extract',
+        payload: { memoryUnitId: unit.id, sourceType: 'slack_message', sourceId: slackMessage.id },
+      });
+    }
   }
 
   // 7. Mark SlackMessage as processed

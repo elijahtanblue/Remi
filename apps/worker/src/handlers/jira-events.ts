@@ -4,6 +4,7 @@ import {
   upsertIssue,
   findWorkspaceByJiraClientKey,
   findLinksByIssueId,
+  getMemoryConfig,
 } from '@remi/db';
 import type { JiraEventMessage } from '@remi/shared';
 import { QueueNames, TriggerReason } from '@remi/shared';
@@ -146,6 +147,24 @@ export async function handleJiraEvent(
         },
       });
       console.log(`[jira-events] Enqueued summary job for issue ${issue.id} (${trigger.reason})`);
+    }
+  }
+
+  // ── Memory ingestion trigger ──────────────────────────────────────────────
+  const memoryConfig = await getMemoryConfig(prisma, workspace.id);
+  if (memoryConfig?.enabled) {
+    const units = await prisma.memoryUnit.findMany({
+      where: { issueId: issue.id, workspaceId: workspace.id },
+    });
+    for (const unit of units) {
+      await queue.send(QueueNames.MEMORY_EXTRACT, {
+        id: uuidv4(),
+        idempotencyKey: `memory-extract-${issueEvent.id}`,
+        workspaceId: workspace.id,
+        timestamp: new Date().toISOString(),
+        type: 'memory_extract',
+        payload: { memoryUnitId: unit.id, sourceType: 'jira_event', sourceId: issueEvent.id },
+      });
     }
   }
 
