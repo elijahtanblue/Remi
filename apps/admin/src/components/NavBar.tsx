@@ -42,8 +42,8 @@ export default function NavBar() {
           <Image
             src="/brand/remi%20square%20light%20-%20no%20text.png"
             alt="Remi"
-            width={28}
-            height={28}
+            width={40}
+            height={40}
             style={{ borderRadius: '6px', display: 'block' }}
           />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
