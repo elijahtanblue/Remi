@@ -1,5 +1,6 @@
 import { ExternalServiceError } from '@remi/shared';
 import { createJiraJwt } from './auth.js';
+import { JIRA_CONNECT_APP_KEY } from './constants.js';
 import type { JiraIssueData } from './types.js';
 
 interface ChangelogEntry {
@@ -16,13 +17,12 @@ interface ChangelogEntry {
 export class JiraClient {
   constructor(
     private baseUrl: string,
-    private clientKey: string,
     private sharedSecret: string,
   ) {}
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const url = `${this.baseUrl}${path}`;
-    const token = createJiraJwt(this.clientKey, this.sharedSecret, method, url);
+    const token = createJiraJwt(JIRA_CONNECT_APP_KEY, this.sharedSecret, method, url);
 
     const res = await fetch(url, {
       method,
@@ -92,6 +92,17 @@ export class JiraClient {
     }>('GET', `/rest/api/3/issue/${issueKey}/changelog`);
 
     return data.values;
+  }
+
+  async searchUsersByQuery(query: string): Promise<Array<{ accountId: string; displayName: string; emailAddress?: string }>> {
+    return this.request<Array<{ accountId: string; displayName: string; emailAddress?: string }>>(
+      'GET',
+      `/rest/api/3/user/search?query=${encodeURIComponent(query)}&maxResults=5`,
+    );
+  }
+
+  async updateAssignee(issueKey: string, accountId: string | null): Promise<void> {
+    await this.request<void>('PUT', `/rest/api/3/issue/${issueKey}/assignee`, { accountId });
   }
 
   async addComment(issueKey: string, body: string): Promise<void> {

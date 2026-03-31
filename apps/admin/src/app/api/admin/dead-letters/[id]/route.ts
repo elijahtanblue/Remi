@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 const ADMIN_KEY = process.env.ADMIN_API_KEY ?? 'dev-admin-key';
 
+// POST → retry, DELETE → delete single entry
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

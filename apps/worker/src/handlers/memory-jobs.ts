@@ -98,8 +98,8 @@ export async function handleMemoryWritebackApply(message: MemoryWritebackApplyMe
     const jiraInstall = await prisma.jiraWorkspaceInstall.findFirst({ where: { workspaceId: message.workspaceId } });
     if (!jiraInstall) throw new Error('No Jira install found for workspace');
 
-    // JiraClient constructor: (baseUrl, clientKey, sharedSecret)
-    const jiraClient = new JiraClient(jiraInstall.jiraSiteUrl, jiraInstall.jiraClientKey, jiraInstall.sharedSecret);
+    // JiraClient constructor: (baseUrl, sharedSecret)
+    const jiraClient = new JiraClient(jiraInstall.jiraSiteUrl, jiraInstall.sharedSecret);
     await applyWriteback(
       { proposalId, commentBody: payload.commentBody, jiraIssueKey: payload.jiraIssueKey, jiraSiteUrl: unit.issue.jiraSiteUrl },
       (_siteUrl: string, issueKey: string, body: string) => jiraClient.addComment(issueKey, body),

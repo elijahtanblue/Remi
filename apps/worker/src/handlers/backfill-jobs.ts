@@ -52,8 +52,8 @@ async function handleJiraIssueBackfill(
     return;
   }
 
-  // JiraClient constructor: (baseUrl, clientKey, sharedSecret)
-  const jiraClient = new JiraClient(install.jiraSiteUrl, install.jiraClientKey, install.sharedSecret);
+  // JiraClient constructor: (baseUrl, sharedSecret)
+  const jiraClient = new JiraClient(install.jiraSiteUrl, install.sharedSecret);
 
   // Always fetch real issue data first — this is the critical path
   const freshIssue = await jiraClient.getIssue(issue.jiraIssueKey);

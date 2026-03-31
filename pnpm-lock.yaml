@@ -303,6 +303,9 @@ importers:
       '@remi/db':
         specifier: workspace:*
         version: link:../db
+      '@remi/jira':
+        specifier: workspace:*
+        version: link:../jira
       '@remi/queue':
         specifier: workspace:*
         version: link:../queue

@@ -149,7 +149,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  // DELETE /admin/dead-letters/:id
+  // DELETE /admin/dead-letters/:id — remove a single entry from storage
   app.delete('/dead-letters/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const dl = await findDeadLetterById(prisma, id);

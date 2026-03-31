@@ -20,7 +20,7 @@ export function verifyJiraJwt(
 }
 
 export function createJiraJwt(
-  clientKey: string,
+  issuer: string,
   sharedSecret: string,
   method: string,
   url: string,
@@ -40,7 +40,7 @@ export function createJiraJwt(
 
   // noTimestamp is NOT used — jsonwebtoken v9 strips manually-set iat when
   // noTimestamp:true is present. Let the library manage iat automatically.
-  return jwt.sign({ iss: clientKey, exp, qsh }, sharedSecret, {
+  return jwt.sign({ iss: issuer, exp, qsh }, sharedSecret, {
     algorithm: 'HS256',
   });
 }

@@ -37,11 +37,15 @@ export default async function SummaryDetailPage({ params }: Props) {
     );
   }
 
+  const workspaceSummariesHref = summary.workspaceId
+    ? `/workspaces/${summary.workspaceId}?tab=summaries`
+    : '/workspaces';
+
   return (
     <div>
       {/* Breadcrumb */}
       <div className="breadcrumb">
-        <Link href="/summaries">Summaries</Link> /
+        <Link href={workspaceSummariesHref}>Workspace Summaries</Link> /
       </div>
 
       {/* Header */}

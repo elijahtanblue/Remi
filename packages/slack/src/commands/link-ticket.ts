@@ -11,6 +11,7 @@ import {
   createAuditLog,
   createProductEvent,
 } from '@remi/db';
+import { JiraClient } from '@remi/jira';
 
 const ISSUE_KEY_RE = /^[A-Z]+-\d+$/;
 
@@ -68,18 +69,46 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
     const isChannelLevel = !command.thread_ts;
 
     try {
-      // 4. If a Slack user ID was mentioned, look up their real display name
+      // 4. If a Slack user ID was mentioned, look up their real display name and email
       let assigneeName: string | null = mentionedName;
-      if (mentionedUserId && !assigneeName) {
+      let mentionedUserEmail: string | null = null;
+      if (mentionedUserId) {
         try {
           const userInfo = await client.users.info({ user: mentionedUserId });
-          assigneeName =
-            userInfo.user?.profile?.display_name ||
-            userInfo.user?.profile?.real_name ||
-            userInfo.user?.name ||
-            null;
+          if (!assigneeName) {
+            assigneeName =
+              userInfo.user?.profile?.display_name ||
+              userInfo.user?.profile?.real_name ||
+              userInfo.user?.name ||
+              null;
+          }
+          mentionedUserEmail = userInfo.user?.profile?.email ?? null;
         } catch {
-          // Non-fatal — proceed without resolved name
+          // Non-fatal — proceed without resolved name/email
+        }
+      }
+
+      // 4a. Resolve Jira account ID so we can write the assignee back to Jira
+      let jiraAccountId: string | null = null;
+      let jiraWriteClient: JiraClient | null = null;
+      if (assigneeName) {
+        const jiraInstall = await prisma.jiraWorkspaceInstall.findFirst({ where: { workspaceId } });
+        if (jiraInstall) {
+          jiraWriteClient = new JiraClient(jiraInstall.jiraSiteUrl, jiraInstall.sharedSecret);
+          try {
+            const query = mentionedUserEmail ?? assigneeName;
+            const matches = await jiraWriteClient.searchUsersByQuery(query);
+            if (mentionedUserEmail) {
+              const exact = matches.find(
+                (u) => u.emailAddress?.toLowerCase() === mentionedUserEmail!.toLowerCase(),
+              );
+              jiraAccountId = (exact ?? matches[0])?.accountId ?? null;
+            } else {
+              jiraAccountId = matches[0]?.accountId ?? null;
+            }
+          } catch {
+            // Non-fatal — skip Jira write if user lookup fails
+          }
         }
       }
 
@@ -116,8 +145,20 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         if (assigneeName) {
           await prisma.issue.update({
             where: { id: issue.id },
-            data: { assigneeDisplayName: assigneeName },
+            data: {
+              assigneeDisplayName: assigneeName,
+              ...(jiraAccountId ? { assigneeJiraAccountId: jiraAccountId } : {}),
+            },
           });
+
+          // Write assignee to Jira
+          if (jiraWriteClient && jiraAccountId) {
+            try {
+              await jiraWriteClient.updateAssignee(issueKey, jiraAccountId);
+            } catch {
+              // Non-fatal — local DB already updated
+            }
+          }
 
           // Re-trigger Jira backfill so title/status/assignee refresh and
           // the summary regenerates with accurate data.
@@ -168,6 +209,19 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         threadId: thread.id,
         linkedByUserId: linkedByUserId ?? undefined,
       });
+
+      // Write assignee to Jira for new links with an assignee specified
+      if (jiraWriteClient && jiraAccountId) {
+        try {
+          await jiraWriteClient.updateAssignee(issueKey, jiraAccountId);
+          await prisma.issue.update({
+            where: { id: issue.id },
+            data: { assigneeJiraAccountId: jiraAccountId },
+          });
+        } catch {
+          // Non-fatal — backfill will still run and sync from Jira
+        }
+      }
 
       // 9. Enqueue backfill jobs — Jira changelog + Slack thread history
       const jiraBackfillKey = uuidv4();

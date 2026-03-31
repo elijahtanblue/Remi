@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 const ADMIN_KEY = process.env.ADMIN_API_KEY ?? 'dev-admin-key';
 
+// DELETE → clear all (or by queue filter)
 export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const queue = searchParams.get('queue') ?? '';

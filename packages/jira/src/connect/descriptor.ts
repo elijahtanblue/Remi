@@ -1,6 +1,8 @@
+import { JIRA_CONNECT_APP_KEY } from '../constants.js';
+
 export function buildConnectDescriptor(baseUrl: string, workspaceId: string): Record<string, unknown> {
   return {
-    key: 'remi-memory',
+    key: JIRA_CONNECT_APP_KEY,
     name: 'Remi',
     description: 'Operational memory for your Slack and Jira workflow',
     vendor: { name: 'Remi', url: baseUrl },

@@ -35,7 +35,7 @@ export default async function DashboardPage() {
             marginBottom: '28px',
           }}
         >
-          Operational tools for managing Remi workspaces, summaries, and queue health.
+          Operational tools for managing Remi workspaces, integrations, and queue health.
         </p>
         <div className="stat-card" style={{ display: 'inline-block', minWidth: '120px' }}>
           <div className="stat-number">{workspaceCount}</div>
@@ -59,7 +59,6 @@ export default async function DashboardPage() {
         }}
       >
         <QuickLink href="/workspaces" title="Workspaces" desc="Browse and manage all workspaces" />
-        <QuickLink href="/summaries" title="Summaries" desc="View and re-run issue summaries" />
         <QuickLink href="/errors" title="Errors" desc="Inspect and retry failed queue messages" />
         <QuickLink href="/analytics" title="Analytics" desc="Feature usage and workspace metrics" />
       </div>
