@@ -13,71 +13,49 @@ const links = [
   { href: '/analytics', label: 'Analytics' },
 ];
 
+function isActivePath(pathname: string, href: string) {
+  if (href === '/') {
+    return pathname === '/';
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function NavBar() {
   const pathname = usePathname();
 
   return (
-    <nav
-      style={{
-        background: 'var(--remi-navy)',
-        borderBottom: '2px solid var(--remi-navy-deep)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '0 28px',
-          display: 'flex',
-          alignItems: 'center',
-          height: '52px',
-          gap: '8px',
-        }}
-      >
+    <nav className="top-nav">
+      <div className="top-nav__inner">
         {/* Brand lockup */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginRight: '28px', flexShrink: 0 }}>
+        <div className="top-nav__brand">
           <Image
             src="/brand/remi%20square%20light%20-%20no%20text.png"
             alt="Remi"
             width={40}
             height={40}
-            style={{ borderRadius: '6px', display: 'block' }}
+            className="top-nav__brand-mark"
           />
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
-            <span style={{ fontSize: '17px', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--remi-serif)', letterSpacing: '-0.01em' }}>
+          <div className="top-nav__brand-text">
+            <span className="top-nav__brand-wordmark">
               Remi
             </span>
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.48)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
+            <span className="top-nav__brand-label">
               Admin
             </span>
           </div>
         </div>
 
         {/* Nav links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, overflowX: 'auto' }}>
+        <div className="top-nav__links">
           {links.map(({ href, label }) => {
-            const isActive =
-              href === '/' ? pathname === '/' : pathname.startsWith(href);
+            const isActive = isActivePath(pathname, href);
             return (
               <Link
                 key={href}
                 href={href}
-                style={{
-                  padding: '6px 13px',
-                  fontSize: '13px',
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? '#ffffff' : 'rgba(255,255,255,0.72)',
-                  textDecoration: 'none',
-                  borderRadius: '6px',
-                  background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
-                  border: '1px solid',
-                  borderColor: isActive ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.10)',
-                  transition: 'background 0.12s, color 0.12s, border-color 0.12s',
-                  whiteSpace: 'nowrap',
-                }}
+                className={`top-nav__link${isActive ? ' is-active' : ''}`}
+                aria-current={isActive ? 'page' : undefined}
               >
                 {label}
               </Link>
