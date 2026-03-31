@@ -30,17 +30,33 @@ export function DeleteButton(props: Props) {
 
     setStatus('loading');
     try {
-      let url: string;
+      let urls: string[];
       if (props.mode === 'single') {
-        url = `/api/admin/dead-letters/${props.itemId}/retry`;
+        urls = [
+          `/api/admin/dead-letters/${props.itemId}`,
+          `/api/admin/dead-letters/${props.itemId}/retry`,
+        ];
       } else {
-        url = `/api/admin/dead-letters${props.queue ? `?queue=${encodeURIComponent(props.queue)}` : ''}`;
+        urls = [
+          `/api/admin/dead-letters${props.queue ? `?queue=${encodeURIComponent(props.queue)}` : ''}`,
+        ];
       }
-      const res = await fetch(url, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Request failed');
-      setStatus('done');
-      router.refresh();
-    } catch {
+
+      let lastError: Error | null = null;
+      for (const url of urls) {
+        const res = await fetch(url, { method: 'DELETE' });
+        if (res.ok) {
+          setStatus('done');
+          router.refresh();
+          return;
+        }
+
+        lastError = new Error(`Request failed with status ${res.status}`);
+      }
+
+      throw lastError ?? new Error('Request failed');
+    } catch (error) {
+      console.error('[DeleteButton] Failed to delete dead letter', error);
       setStatus('error');
     }
   };
@@ -48,6 +64,7 @@ export function DeleteButton(props: Props) {
   if (props.mode === 'clear-all') {
     return (
       <button
+        type="button"
         onClick={handleClick}
         disabled={status === 'loading'}
         className="btn-danger"
@@ -62,6 +79,7 @@ export function DeleteButton(props: Props) {
 
   return (
     <button
+      type="button"
       onClick={handleClick}
       disabled={status === 'loading'}
       style={{

@@ -2,7 +2,8 @@ import {
   prisma,
   createIssueEvent,
   createSlackMessage,
-  upsertIssue,
+  findIssueByJiraId,
+  mergeIssues,
   PrismaClient as _PrismaClient,
   Prisma,
 } from '@remi/db';
@@ -64,8 +65,14 @@ async function handleJiraIssueBackfill(
       : freshIssue.assignee?.displayName ??
         (issue.assigneeJiraAccountId === nextAssigneeJiraAccountId ? issue.assigneeDisplayName : null);
   const canonicalJiraIssueId = freshIssue.id ?? issue.jiraIssueId;
+  const existingCanonical = await findIssueByJiraId(prisma, canonicalJiraIssueId, install.jiraSiteUrl);
+  const targetIssue =
+    existingCanonical && existingCanonical.id !== issue.id
+      ? await mergeIssues(prisma, issue.id, existingCanonical.id)
+      : issue;
+
   await prisma.issue.update({
-    where: { id: issue.id },
+    where: { id: targetIssue.id },
     data: {
       jiraIssueId: canonicalJiraIssueId,
       jiraSiteUrl: install.jiraSiteUrl,
@@ -89,7 +96,7 @@ async function handleJiraIssueBackfill(
     // Batch-fetch all existing idempotency keys for this issue in one query
     // to avoid N+1 lookups in the loop below.
     const existingEvents = await prisma.issueEvent.findMany({
-      where: { issueId: issue.id, source: 'jira_backfill' },
+      where: { issueId: targetIssue.id, source: 'jira_backfill' },
       select: { idempotencyKey: true },
     });
     const existingKeys = new Set(existingEvents.map((e) => e.idempotencyKey));
@@ -121,7 +128,7 @@ async function handleJiraIssueBackfill(
       }
 
       await createIssueEvent(prisma, {
-        issueId: issue.id,
+        issueId: targetIssue.id,
         idempotencyKey,
         eventType: derivedEventType,
         source: 'jira_backfill',
@@ -135,7 +142,7 @@ async function handleJiraIssueBackfill(
   }
 
   // Enqueue summary after backfill
-  const summaryIdempotencyKey = `summary:backfill:${issue.id}:${Date.now()}`;
+  const summaryIdempotencyKey = `summary:backfill:${targetIssue.id}:${Date.now()}`;
   await queue.send(QueueNames.SUMMARY_JOBS, {
     type: 'summary_job',
     id: uuidv4(),
@@ -143,13 +150,13 @@ async function handleJiraIssueBackfill(
     idempotencyKey: summaryIdempotencyKey,
     timestamp: new Date().toISOString(),
     payload: {
-      issueId: issue.id,
+      issueId: targetIssue.id,
       triggerReason: TriggerReason.BACKFILL_COMPLETE,
       force: true,
     },
   });
 
-  console.log(`[backfill-jobs] Jira backfill complete for issue ${issue.id}`);
+  console.log(`[backfill-jobs] Jira backfill complete for issue ${targetIssue.id}`);
 }
 
 async function handleSlackThreadBackfill(
