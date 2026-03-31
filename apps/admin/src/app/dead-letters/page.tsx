@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { api, type DeadLetterItem } from '@/lib/api';
 import { RetryButton } from './RetryButton';
 
 interface Props {
@@ -10,11 +10,11 @@ export default async function DeadLettersPage({ searchParams }: Props) {
   const limit = limitStr ? parseInt(limitStr, 10) : 20;
   const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
 
-  let items: any[] = [];
+  let items: DeadLetterItem[] = [];
   let error: string | null = null;
 
   try {
-    const data = await api.getDeadLetters({ queue, limit, offset });
+    const data = await api.getDeadLetters({ queue, limit, offset, includeRetried: true });
     items = data.items;
   } catch (e) {
     error = e instanceof Error ? e.message : 'Failed to load dead letter queue';
@@ -24,25 +24,24 @@ export default async function DeadLettersPage({ searchParams }: Props) {
     <div>
       <div className="page-header">
         <h1>Dead Letters</h1>
-        <p>Messages that failed processing and were moved to the dead letter queue.</p>
+        <p>Historical failed queue messages, including entries that have already been retried.</p>
       </div>
 
-      {/* Queue filter */}
       <form method="GET" className="filter-bar">
         <label>Queue:</label>
         <input
           name="queue"
           defaultValue={queue ?? ''}
-          placeholder="Filter by queue name…"
+          placeholder="Filter by queue name..."
           style={{ width: '220px' }}
         />
         <button type="submit" className="btn-primary">Filter</button>
-        {queue && (
+        {queue ? (
           <a href="/dead-letters" style={{ fontSize: '13px' }}>Clear</a>
-        )}
+        ) : null}
       </form>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error ? <div className="error-banner">{error}</div> : null}
 
       <div className="table-shell">
         <table>
@@ -67,10 +66,15 @@ export default async function DeadLettersPage({ searchParams }: Props) {
               items.map((item) => (
                 <tr key={item.id}>
                   <td>
-                    <code style={{ fontSize: '13px' }}>{item.queue ?? '—'}</code>
+                    <code style={{ fontSize: '13px' }}>{item.queue ?? '-'}</code>
                   </td>
                   <td>
-                    <code style={{ fontSize: '12px' }}>{item.messageId ?? item.id ?? '—'}</code>
+                    <div style={{ display: 'grid', gap: '4px' }}>
+                      <code style={{ fontSize: '12px' }}>{item.messageId ?? item.id ?? '-'}</code>
+                      <span style={{ fontSize: '11px', color: 'var(--remi-muted)' }} title={item.id}>
+                        Row ID: <code style={{ fontSize: '11px' }}>{item.id}</code>
+                      </span>
+                    </div>
                   </td>
                   <td
                     style={{
@@ -83,7 +87,7 @@ export default async function DeadLettersPage({ searchParams }: Props) {
                     }}
                     title={item.error ?? ''}
                   >
-                    {item.error ?? '—'}
+                    {item.error ?? '-'}
                   </td>
                   <td style={{ fontSize: '13px', textAlign: 'center' }}>
                     {item.retryCount != null ? (
@@ -91,15 +95,11 @@ export default async function DeadLettersPage({ searchParams }: Props) {
                         {item.retryCount}
                       </span>
                     ) : (
-                      '—'
+                      '-'
                     )}
                   </td>
                   <td style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>
-                    {item.failedAt
-                      ? new Date(item.failedAt).toLocaleString()
-                      : item.createdAt
-                        ? new Date(item.createdAt).toLocaleString()
-                        : '—'}
+                    {item.failedAt ? new Date(item.failedAt).toLocaleString() : '-'}
                   </td>
                   <td>
                     <RetryButton itemId={item.id} />
@@ -111,19 +111,18 @@ export default async function DeadLettersPage({ searchParams }: Props) {
         </table>
       </div>
 
-      {/* Pagination */}
-      {items.length === limit && (
+      {items.length === limit ? (
         <div className="pagination">
-          {offset > 0 && (
+          {offset > 0 ? (
             <a href={`/dead-letters?queue=${queue ?? ''}&limit=${limit}&offset=${Math.max(0, offset - limit)}`}>
               &larr; Previous
             </a>
-          )}
+          ) : null}
           <a href={`/dead-letters?queue=${queue ?? ''}&limit=${limit}&offset=${offset + limit}`}>
             Next &rarr;
           </a>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

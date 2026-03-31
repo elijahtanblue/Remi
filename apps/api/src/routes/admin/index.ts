@@ -23,6 +23,7 @@ import { QueueNames } from '@remi/shared';
 import { v4 as uuidv4 } from 'uuid';
 import { validateGmailConfigBody } from './gmail-config.js';
 import { memoryRoutes } from './memory.js';
+import { parseDeadLetterDeleteQuery, parseDeadLetterListQuery } from './dead-letter-query.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   await app.register(memoryRoutes, { prefix: '/memory', queue });
@@ -118,20 +119,13 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // GET /admin/dead-letters
   app.get('/dead-letters', async (request) => {
-    const {
-      queue: queueName,
-      limit = 20,
-      offset = 0,
-    } = request.query as {
+    const opts = parseDeadLetterListQuery(request.query as {
       queue?: string;
-      limit?: number;
-      offset?: number;
-    };
-    const items = await listDeadLetters(prisma, {
-      queue: queueName,
-      limit: Number(limit),
-      offset: Number(offset),
+      limit?: number | string;
+      offset?: number | string;
+      includeRetried?: boolean | string;
     });
+    const items = await listDeadLetters(prisma, opts);
     return { items };
   });
 
@@ -160,8 +154,11 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // DELETE /admin/dead-letters — clears all (or by queue filter)
   app.delete('/dead-letters', async (request) => {
-    const { queue: queueName } = request.query as { queue?: string };
-    const result = await deleteDeadLettersByQueue(prisma, queueName);
+    const opts = parseDeadLetterDeleteQuery(request.query as {
+      queue?: string;
+      includeRetried?: boolean | string;
+    });
+    const result = await deleteDeadLettersByQueue(prisma, opts);
     return { ok: true, deleted: result.count };
   });
 

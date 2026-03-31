@@ -10,6 +10,40 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface DeadLetterItem {
+  id: string;
+  messageId: string | null;
+  queue: string;
+  error: string;
+  retryCount: number;
+  failedAt: string;
+  retriedAt: string | null;
+}
+
+export interface DeadLetterListParams {
+  queue?: string;
+  limit?: number;
+  offset?: number;
+  includeRetried?: boolean;
+}
+
+export function buildDeadLetterListPath(params?: DeadLetterListParams) {
+  const searchParams = new URLSearchParams();
+
+  if (params?.queue) {
+    searchParams.set('queue', params.queue);
+  }
+
+  searchParams.set('limit', String(params?.limit ?? 20));
+  searchParams.set('offset', String(params?.offset ?? 0));
+
+  if (params?.includeRetried) {
+    searchParams.set('includeRetried', 'true');
+  }
+
+  return `/admin/dead-letters?${searchParams.toString()}`;
+}
+
 export const api = {
   getWorkspaces: () => apiFetch<{ workspaces: any[] }>('/admin/workspaces'),
   getSummaries: (workspaceId: string, params?: { limit?: number; offset?: number }) =>
@@ -19,10 +53,8 @@ export const api = {
   getSummary: (id: string) => apiFetch<{ summary: any }>(`/admin/summaries/${id}`),
   rerunSummary: (id: string) =>
     apiFetch<{ ok: boolean }>(`/admin/summaries/${id}/rerun`, { method: 'POST' }),
-  getDeadLetters: (params?: { queue?: string; limit?: number; offset?: number }) =>
-    apiFetch<{ items: any[] }>(
-      `/admin/dead-letters?queue=${params?.queue ?? ''}&limit=${params?.limit ?? 20}&offset=${params?.offset ?? 0}`
-    ),
+  getDeadLetters: (params?: DeadLetterListParams) =>
+    apiFetch<{ items: DeadLetterItem[] }>(buildDeadLetterListPath(params)),
   retryDeadLetter: (id: string) =>
     apiFetch<{ ok: boolean }>(`/admin/dead-letters/${id}/retry`, { method: 'POST' }),
   getAuditLog: (workspaceId: string, params?: { limit?: number; offset?: number; action?: string }) =>

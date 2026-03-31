@@ -1,5 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 
+export interface DeadLetterQueryOptions {
+  queue?: string;
+  limit?: number;
+  offset?: number;
+  includeRetried?: boolean;
+}
+
+function buildDeadLetterWhere(opts?: Pick<DeadLetterQueryOptions, 'queue' | 'includeRetried'>) {
+  return {
+    ...(opts?.queue ? { queue: opts.queue } : {}),
+    ...(opts?.includeRetried ? {} : { retriedAt: null }),
+  };
+}
+
 export async function createDeadLetter(
   prisma: PrismaClient,
   data: {
@@ -23,12 +37,10 @@ export async function createDeadLetter(
 
 export async function listDeadLetters(
   prisma: PrismaClient,
-  opts?: { queue?: string; limit?: number; offset?: number },
+  opts?: DeadLetterQueryOptions,
 ) {
   return prisma.queueDeadLetter.findMany({
-    where: {
-      ...(opts?.queue ? { queue: opts.queue } : {}),
-    },
+    where: buildDeadLetterWhere(opts),
     take: opts?.limit ?? 50,
     skip: opts?.offset ?? 0,
     orderBy: { failedAt: 'desc' },
@@ -53,8 +65,11 @@ export async function deleteDeadLetter(prisma: PrismaClient, id: string) {
   return prisma.queueDeadLetter.delete({ where: { id } });
 }
 
-export async function deleteDeadLettersByQueue(prisma: PrismaClient, queue?: string) {
+export async function deleteDeadLettersByQueue(
+  prisma: PrismaClient,
+  opts?: Pick<DeadLetterQueryOptions, 'queue' | 'includeRetried'>,
+) {
   return prisma.queueDeadLetter.deleteMany({
-    where: queue ? { queue } : {},
+    where: buildDeadLetterWhere(opts),
   });
 }
