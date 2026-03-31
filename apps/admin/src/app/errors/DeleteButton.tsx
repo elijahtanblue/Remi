@@ -32,7 +32,7 @@ export function DeleteButton(props: Props) {
     try {
       let url: string;
       if (props.mode === 'single') {
-        url = `/api/admin/dead-letters/${props.itemId}`;
+        url = `/api/admin/dead-letters/${props.itemId}/retry`;
       } else {
         url = `/api/admin/dead-letters${props.queue ? `?queue=${encodeURIComponent(props.queue)}` : ''}`;
       }

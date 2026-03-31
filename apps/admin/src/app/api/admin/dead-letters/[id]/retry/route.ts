@@ -15,3 +15,16 @@ export async function POST(
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const res = await fetch(`${API_URL}/admin/dead-letters/${id}`, {
+    method: 'DELETE',
+    headers: { 'x-admin-key': ADMIN_KEY },
+  });
+  const data = await res.json();
+  return NextResponse.json(data, { status: res.status });
+}
