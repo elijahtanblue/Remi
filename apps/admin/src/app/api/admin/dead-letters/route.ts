@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { proxyAdminResponse } from '../proxy-response';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 const ADMIN_KEY = process.env.ADMIN_API_KEY ?? 'dev-admin-key';
@@ -16,10 +17,8 @@ export async function DELETE(req: NextRequest) {
     apiSearchParams.set('includeRetried', 'true');
   }
   const url = `${API_URL}/admin/dead-letters${apiSearchParams.size > 0 ? `?${apiSearchParams.toString()}` : ''}`;
-  const res = await fetch(url, {
+  return proxyAdminResponse(url, {
     method: 'DELETE',
     headers: { 'x-admin-key': ADMIN_KEY },
   });
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
 }

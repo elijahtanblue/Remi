@@ -1,5 +1,6 @@
 export interface DeadLetterActionError {
   error?: string;
+  message?: string;
 }
 
 export interface DeadLetterActionResponse {
@@ -22,6 +23,9 @@ function parseErrorMessage(bodyText: string, status: number) {
 
   try {
     const parsed = JSON.parse(trimmed) as DeadLetterActionError;
+    if (typeof parsed?.message === 'string' && parsed.message.length > 0) {
+      return parsed.message;
+    }
     if (typeof parsed?.error === 'string' && parsed.error.length > 0) {
       return parsed.error;
     }

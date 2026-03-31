@@ -30,6 +30,20 @@ describe('dead letter action responses', () => {
     });
   });
 
+  it('prefers a JSON message field when present', async () => {
+    const response = {
+      ok: false,
+      status: 500,
+      text: vi.fn().mockResolvedValue(JSON.stringify({ message: 'Dead letter queue write failed' })),
+    } as any;
+
+    await expect(readDeadLetterActionResponse(response)).resolves.toEqual({
+      ok: false,
+      status: 500,
+      error: 'Dead letter queue write failed',
+    });
+  });
+
   it('falls back to a status-based message when the error body is empty', async () => {
     const response = {
       ok: false,
