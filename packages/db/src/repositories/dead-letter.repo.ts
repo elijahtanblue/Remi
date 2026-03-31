@@ -48,3 +48,13 @@ export async function retryDeadLetter(prisma: PrismaClient, id: string) {
     },
   });
 }
+
+export async function deleteDeadLetter(prisma: PrismaClient, id: string) {
+  return prisma.queueDeadLetter.delete({ where: { id } });
+}
+
+export async function deleteDeadLettersByQueue(prisma: PrismaClient, queue?: string) {
+  return prisma.queueDeadLetter.deleteMany({
+    where: queue ? { queue } : {},
+  });
+}

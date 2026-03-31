@@ -4,7 +4,7 @@ import { useState } from 'react';
 import EmailSettingsClient from './EmailSettingsClient';
 
 type AppId = 'slack' | 'jira' | 'gmail' | 'outlook';
-type AppType = 'messaging' | 'task_planning';
+type AppType = 'communication' | 'project_management';
 
 interface AppDef {
   id: AppId;
@@ -15,15 +15,15 @@ interface AppDef {
 }
 
 const APPS: AppDef[] = [
-  { id: 'slack',   name: 'Slack',   type: 'messaging',     typeLabel: 'Messaging',     connected: true  },
-  { id: 'gmail',   name: 'Gmail',   type: 'messaging',     typeLabel: 'Messaging',     connected: false },
-  { id: 'outlook', name: 'Outlook', type: 'messaging',     typeLabel: 'Messaging',     connected: false },
-  { id: 'jira',    name: 'Jira',    type: 'task_planning', typeLabel: 'Task Planning', connected: true  },
+  { id: 'slack',   name: 'Slack',   type: 'communication',      typeLabel: 'Communication',      connected: true  },
+  { id: 'gmail',   name: 'Gmail',   type: 'communication',      typeLabel: 'Communication',      connected: false },
+  { id: 'outlook', name: 'Outlook', type: 'communication',      typeLabel: 'Communication',      connected: false },
+  { id: 'jira',    name: 'Jira',    type: 'project_management', typeLabel: 'Project Management', connected: true  },
 ];
 
 const TYPE_COLORS: Record<AppType, { bg: string; text: string }> = {
-  messaging:    { bg: 'var(--remi-accent-soft)', text: 'var(--remi-navy)' },
-  task_planning: { bg: '#E8F5EE', text: '#1a7a3c' },
+  communication:      { bg: 'var(--remi-accent-soft)', text: 'var(--remi-navy)' },
+  project_management: { bg: '#E8F5EE', text: '#1a7a3c' },
 };
 
 const DEFAULT_ROLES = ['CEO', 'VP', 'Director', 'Manager', 'Associate', 'Contractor'];
@@ -159,18 +159,18 @@ function InfoGatheringSection({ appType }: { appType: AppType }) {
     <SectionCard title="Information Gathering">
       <SettingRow
         label="Enable data capture"
-        description={appType === 'messaging'
+        description={appType === 'communication'
           ? 'Capture thread messages for summary generation.'
           : 'Capture issue updates and comments for summaries.'}
       >
         <Toggle checked={captureEnabled} onChange={setCaptureEnabled} />
       </SettingRow>
-      {appType === 'messaging' && (
+      {appType === 'communication' && (
         <SettingRow label="Capture direct message threads" description="Allow Remi to process DM threads when explicitly linked. Off by default.">
           <Toggle checked={captureDMs} onChange={setCaptureDMs} />
         </SettingRow>
       )}
-      {appType === 'task_planning' && (
+      {appType === 'project_management' && (
         <SettingRow label="Capture issue changelog" description="Include field changes (status, assignee, priority) in context data.">
           <Toggle checked={captureEnabled} onChange={setCaptureEnabled} />
         </SettingRow>
@@ -232,7 +232,7 @@ function SlackSettings() {
       </SectionCard>
 
       <RolePrivacySection />
-      <InfoGatheringSection appType="messaging" />
+      <InfoGatheringSection appType="communication" />
 
       <SectionCard title="Notifications">
         <SettingRow label="Summary delivery method" description="Where Remi posts generated summaries.">
@@ -331,7 +331,7 @@ function JiraSettings() {
       </SectionCard>
 
       <RolePrivacySection />
-      <InfoGatheringSection appType="task_planning" />
+      <InfoGatheringSection appType="project_management" />
 
       <SectionCard title="Access Control">
         <SettingRow label="Admin-only projects" description="Projects whose summaries are only visible to Manager level and above.">
@@ -378,9 +378,17 @@ export default function IntegrationsClient() {
     slack: true, jira: true, gmail: false, outlook: false,
   });
   const [saved, setSaved] = useState(false);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<AppType | null>(null);
 
   const apps = APPS.map((a) => ({ ...a, connected: appStates[a.id] }));
   const app = apps.find((a) => a.id === activeApp)!;
+
+  const visibleApps = apps.filter((a) => {
+    const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === null || a.type === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
   const typeColor = TYPE_COLORS[app.type];
 
   function handleConnect(id: AppId) {
@@ -405,31 +413,51 @@ export default function IntegrationsClient() {
 
   return (
     <div>
-      <div style={{ marginBottom: '28px' }}>
+      <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '6px' }}>Integration Settings</h1>
         <p style={{ fontSize: '14px', color: '#6c757d' }}>
           Configure controls, permissions, and data policies for each connected application.
         </p>
       </div>
 
-      {/* Type legend */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {(['messaging', 'task_planning'] as AppType[]).map((type) => {
-          const c = TYPE_COLORS[type];
-          return (
-            <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '6px', background: c.bg, fontSize: '12px', fontWeight: 500, color: c.text }}>
-              {type === 'messaging' ? 'Messaging' : 'Task Planning'}
-            </div>
-          );
-        })}
-        <div style={{ fontSize: '12px', color: '#6c757d', display: 'flex', alignItems: 'center' }}>
-          Information gathering is enabled for all integrations
+      {/* Search + category filters */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <input
+          type="search"
+          placeholder="Search integrations…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            padding: '7px 12px', fontSize: '13px', border: '1px solid var(--remi-border)',
+            borderRadius: '6px', background: '#fff', width: '200px',
+          }}
+        />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {(['communication', 'project_management'] as AppType[]).map((type) => {
+            const c = TYPE_COLORS[type];
+            const isActive = categoryFilter === type;
+            return (
+              <button
+                key={type}
+                onClick={() => setCategoryFilter(isActive ? null : type)}
+                style={{
+                  padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                  border: '1px solid', cursor: 'pointer', transition: 'all 0.12s',
+                  background: isActive ? c.bg : '#fff',
+                  color: isActive ? c.text : 'var(--remi-muted)',
+                  borderColor: isActive ? c.text : 'var(--remi-border)',
+                }}
+              >
+                {type === 'communication' ? 'Communication' : 'Project Management'}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* App tabs */}
       <div className="tab-strip" style={{ marginBottom: '28px' }}>
-        {apps.map((a) => {
+        {visibleApps.map((a) => {
           const isActive = a.id === activeApp;
           const c = TYPE_COLORS[a.type];
           return (

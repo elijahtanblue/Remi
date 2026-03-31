@@ -111,7 +111,7 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
               <tr>
                 <th>Action</th>
                 <th>Actor Type</th>
-                <th>Actor ID</th>
+                <th>Actor</th>
                 <th>Target</th>
                 <th>Created At</th>
               </tr>
@@ -128,8 +128,10 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
                       <code style={{ fontSize: '13px' }}>{log.action ?? '—'}</code>
                     </td>
                     <td style={{ fontSize: '13px' }}>{log.actorType ?? '—'}</td>
-                    <td>
-                      <code style={{ fontSize: '12px' }}>{log.actorId ?? '—'}</code>
+                    <td style={{ fontSize: '13px' }}>
+                      {log.actorDisplay ?? (
+                        <code style={{ fontSize: '12px', color: 'var(--remi-muted)' }}>{log.actorId ?? '—'}</code>
+                      )}
                     </td>
                     <td style={{ fontSize: '13px' }}>{log.target ?? log.targetId ?? '—'}</td>
                     <td style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>

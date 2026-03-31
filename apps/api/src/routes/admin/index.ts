@@ -7,6 +7,8 @@ import {
   listAuditLogs,
   listDeadLetters,
   retryDeadLetter,
+  deleteDeadLetter,
+  deleteDeadLettersByQueue,
   findDeadLetterById,
   listSummariesByWorkspace,
   findSummaryById,
@@ -147,6 +149,22 @@ export async function adminRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  // DELETE /admin/dead-letters/:id
+  app.delete('/dead-letters/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const dl = await findDeadLetterById(prisma, id);
+    if (!dl) return reply.code(404).send({ error: 'Dead letter not found' });
+    await deleteDeadLetter(prisma, id);
+    return { ok: true };
+  });
+
+  // DELETE /admin/dead-letters — clears all (or by queue filter)
+  app.delete('/dead-letters', async (request) => {
+    const { queue: queueName } = request.query as { queue?: string };
+    const result = await deleteDeadLettersByQueue(prisma, queueName);
+    return { ok: true, deleted: result.count };
+  });
+
   // POST /admin/gmail/configure
   // Saves or updates the Google service account for a workspace's Gmail integration.
   // Body: { workspaceId, serviceAccountJson, domain, monitoredEmails }
@@ -226,6 +244,26 @@ export async function adminRoutes(app: FastifyInstance) {
       offset: Number(offset),
       action,
     });
-    return { logs };
+
+    // Enrich logs with actor email (Slack user ID → SlackUser → User.email)
+    const slackActorIds = [...new Set(
+      logs.filter((l) => l.actorId?.startsWith('U')).map((l) => l.actorId!)
+    )];
+    const slackUsers = slackActorIds.length > 0
+      ? await prisma.slackUser.findMany({
+          where: { slackUserId: { in: slackActorIds } },
+          include: { user: { select: { email: true, displayName: true } } },
+        })
+      : [];
+    const slackMap = new Map(slackUsers.map((su) => [su.slackUserId, su.user]));
+
+    const enriched = logs.map((log) => ({
+      ...log,
+      actorDisplay: log.actorId
+        ? (slackMap.get(log.actorId)?.email ?? slackMap.get(log.actorId)?.displayName ?? null)
+        : null,
+    }));
+
+    return { logs: enriched };
   });
 }
