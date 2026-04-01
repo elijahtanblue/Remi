@@ -1,8 +1,6 @@
 import { NextRequest } from 'next/server';
+import { ADMIN_API_URL, ADMIN_KEY } from '../config';
 import { proxyAdminResponse } from '../proxy-response';
-
-const API_URL = process.env.API_URL ?? 'http://localhost:3000';
-const ADMIN_KEY = process.env.ADMIN_API_KEY ?? 'dev-admin-key';
 
 // DELETE → clear all (or by queue filter)
 export async function DELETE(req: NextRequest) {
@@ -16,7 +14,7 @@ export async function DELETE(req: NextRequest) {
   if (includeRetried) {
     apiSearchParams.set('includeRetried', 'true');
   }
-  const url = `${API_URL}/admin/dead-letters${apiSearchParams.size > 0 ? `?${apiSearchParams.toString()}` : ''}`;
+  const url = `${ADMIN_API_URL}/admin/dead-letters${apiSearchParams.size > 0 ? `?${apiSearchParams.toString()}` : ''}`;
   return proxyAdminResponse(url, {
     method: 'DELETE',
     headers: { 'x-admin-key': ADMIN_KEY },
