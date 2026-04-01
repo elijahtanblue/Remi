@@ -41,10 +41,16 @@ export function formatSummary(
     }
   }
 
+  const STATUS_CATEGORY_LABEL: Record<string, string> = {
+    new: 'To Do',
+    indeterminate: 'In Progress',
+    done: 'Done',
+  };
+
   return {
     issueKey: issue.jiraIssueKey,
     issueTitle: issue.title,
-    currentStatus: issue.status ?? 'Unknown',
+    currentStatus: STATUS_CATEGORY_LABEL[issue.statusCategory ?? ''] ?? issue.status ?? 'Unknown',
     assignee: issue.assigneeDisplayName ?? issue.assigneeJiraAccountId ?? null,
     previousAssignee: analysis.previousAssignee,
     latestImportantChanges,

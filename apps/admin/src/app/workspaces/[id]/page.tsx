@@ -1,6 +1,7 @@
 import { api } from '@/lib/api';
 import Link from 'next/link';
 import { RerunButton } from './RerunButton';
+import { MemoryPanel } from './MemoryPanel';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -47,6 +48,8 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+
+      <MemoryPanel workspaceId={id} />
 
       {/* Tab bar */}
       <div className="tab-strip">

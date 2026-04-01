@@ -9,6 +9,7 @@ import {
   updateProposalStatus,
   upsertMemoryConfig,
   getMemoryConfig,
+  findOrCreateMemoryUnit,
 } from '@remi/db';
 import { QueueNames } from '@remi/shared';
 import type { IQueueProducer } from '@remi/queue';
@@ -104,6 +105,42 @@ export async function memoryRoutes(app: FastifyInstance, { queue }: { queue: IQu
       return reply.send({ ok: true });
     }
   );
+
+  // POST /admin/memory/backfill/:workspaceId
+  // Processes all existing Slack messages for linked threads through the memory pipeline.
+  app.post<{ Params: { workspaceId: string } }>('/backfill/:workspaceId', async (req, reply) => {
+    const { workspaceId } = req.params;
+
+    const links = await prisma.issueThreadLink.findMany({
+      where: { unlinkedAt: null, thread: { workspaceId } },
+      include: {
+        thread: {
+          include: {
+            messages: { orderBy: { sentAt: 'desc' }, take: 50 },
+          },
+        },
+      },
+    });
+
+    let enqueuedJobs = 0;
+    for (const link of links) {
+      const { unit } = await findOrCreateMemoryUnit(prisma, workspaceId, 'issue_thread', link.thread.id, link.issueId);
+      for (const message of link.thread.messages) {
+        const jobKey = uuidv4();
+        await queue.send(QueueNames.MEMORY_EXTRACT, {
+          id: jobKey,
+          idempotencyKey: `memory-backfill-${message.id}`,
+          workspaceId,
+          timestamp: new Date().toISOString(),
+          type: 'memory_extract',
+          payload: { memoryUnitId: unit.id, sourceType: 'slack_message', sourceId: message.id },
+        });
+        enqueuedJobs++;
+      }
+    }
+
+    return reply.send({ ok: true, enqueuedJobs, linksProcessed: links.length });
+  });
 
   // POST /admin/memory/units/:workspaceId/:unitId/rerun
   app.post<{ Params: { workspaceId: string; unitId: string } }>(

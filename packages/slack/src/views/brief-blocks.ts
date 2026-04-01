@@ -92,18 +92,6 @@ export function buildBriefBlocks(summary: SummaryOutput): unknown[] {
     });
   }
 
-  // Missing signals
-  if (missingSignals.length > 0) {
-    blocks.push({ type: 'divider' });
-    blocks.push({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*Missing Signals*\n${missingSignals.map((s) => `• ${s}`).join('\n')}`,
-      },
-    });
-  }
-
   // Footer: generated at
   blocks.push({ type: 'divider' });
   blocks.push({
