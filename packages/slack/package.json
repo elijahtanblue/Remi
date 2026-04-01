@@ -17,6 +17,8 @@
     "@remi/db": "workspace:*",
     "@remi/queue": "workspace:*",
     "@remi/jira": "workspace:*",
+    "@remi/summary-engine": "workspace:*",
+    "@remi/summary-engine": "workspace:*",
     "uuid": "^11.0.0"
   },
   "devDependencies": {

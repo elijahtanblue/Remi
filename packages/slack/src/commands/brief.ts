@@ -2,7 +2,8 @@ import type { App } from '@slack/bolt';
 import { v4 as uuidv4 } from 'uuid';
 import { QueueNames } from '@remi/shared';
 import type { IQueueProducer } from '@remi/queue';
-import { prisma, findIssueByKey, findCurrentSummary, createProductEvent, getMemoryConfig, getLatestSnapshot } from '@remi/db';
+import { prisma, findIssueByKey, createProductEvent, getMemoryConfig, getLatestSnapshot } from '@remi/db';
+import { generateSummary } from '@remi/summary-engine';
 import { buildBriefBlocks } from '../views/brief-blocks.js';
 
 const ISSUE_KEY_RE = /^[A-Z]+-\d+$/;
@@ -11,12 +12,8 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
   app.command('/brief', async ({ command, ack, respond, context, logger }) => {
     await ack();
 
-    // 1. Parse and validate issue key (strip --refresh flag first)
-    const forceRefresh = command.text.includes('--refresh');
-    const issueKey = command.text
-      .replace('--refresh', '')
-      .trim()
-      .toUpperCase();
+    // 1. Parse and validate issue key
+    const issueKey = command.text.trim().toUpperCase();
 
     if (!ISSUE_KEY_RE.test(issueKey)) {
       await respond({
@@ -39,10 +36,7 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
         return;
       }
 
-      // Find current summary
-      const summary = await findCurrentSummary(prisma, issue.id);
-
-      // Check if Autonomous Memory is enabled for this workspace
+      // 3. Check if Autonomous Memory is enabled for this workspace
       const memConfig = await getMemoryConfig(prisma, workspaceId);
       if (memConfig?.enabled) {
         const units = await prisma.memoryUnit.findMany({
@@ -94,13 +88,12 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
           }
         }
       }
-      // Falls through to existing deterministic summary path if memory is disabled or no snapshot exists
+      // Falls through to deterministic summary path if memory is disabled or no snapshot exists
 
-      // 3. If issue data is still placeholder (Jira backfill hasn't completed yet),
-      //    trigger a Jira backfill which will enqueue a summary job automatically.
+      // 4. If issue data is still placeholder (Jira backfill hasn't completed yet),
+      //    trigger a Jira backfill and ask the user to check back.
       const isStale = issue.title === issue.jiraIssueKey || issue.status === 'Unknown';
       if (isStale) {
-        // Find any existing thread link for this issue to use as backfill anchor.
         const anyLink = await prisma.issueThreadLink.findFirst({
           where: { issueId: issue.id },
           include: { thread: true },
@@ -128,42 +121,11 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
         return;
       }
 
-      // 4. If --refresh or no summary exists: enqueue summary job
-      if (forceRefresh || !summary) {
-        const idempotencyKey = uuidv4();
-        await queue.send(QueueNames.SUMMARY_JOBS, {
-          id: idempotencyKey,
-          idempotencyKey,
-          workspaceId,
-          timestamp: new Date().toISOString(),
-          type: 'summary_job',
-          payload: {
-            issueId: issue.id,
-            triggerReason: 'manual_request',
-            force: forceRefresh,
-          },
-        });
+      // 5. Generate a fresh summary now and respond immediately
+      const result = await generateSummary(prisma, issue.id, 'manual_request', { force: true });
 
-        void createProductEvent(prisma, {
-          workspaceId,
-          event: forceRefresh ? 'brief_refreshed' : 'brief_requested',
-          actorId: command.user_id,
-          properties: { issueKey, channelId: command.channel_id },
-        }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
-
-        await respond({
-          response_type: 'ephemeral',
-          text: `Generating summary for *${issueKey}*... Check back shortly.`,
-        });
-        return;
-      }
-
-      // 4. Summary exists — format and respond with Block Kit
-      // The DB summary content is stored as a JSON object; cast it to SummaryOutput
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const summaryOutput = summary.content as any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blocks = buildBriefBlocks(summaryOutput) as any[];
+      const blocks = buildBriefBlocks(result.summary) as any[];
 
       void createProductEvent(prisma, {
         workspaceId,
@@ -172,7 +134,6 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
         properties: { issueKey, channelId: command.channel_id },
       }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
 
-      // 5. Respond in-channel with the summary
       await respond({
         response_type: 'in_channel',
         blocks,

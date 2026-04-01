@@ -312,6 +312,9 @@ importers:
       '@remi/shared':
         specifier: workspace:*
         version: link:../shared
+      '@remi/summary-engine':
+        specifier: workspace:*
+        version: link:../summary-engine
       '@slack/bolt':
         specifier: ^3.22.0
         version: 3.22.0
