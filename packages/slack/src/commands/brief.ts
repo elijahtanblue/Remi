@@ -4,6 +4,7 @@ import { QueueNames } from '@remi/shared';
 import type { IQueueProducer } from '@remi/queue';
 import { prisma, findIssueByKey, createProductEvent, getMemoryConfig, getLatestSnapshot } from '@remi/db';
 import { generateSummary } from '@remi/summary-engine';
+import { JiraClient } from '@remi/jira';
 import { buildBriefBlocks } from '../views/brief-blocks.js';
 
 const ISSUE_KEY_RE = /^[A-Z]+-\d+$/;
@@ -121,7 +122,30 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
         return;
       }
 
-      // 5. Generate a fresh summary now and respond immediately
+      // 5. Pull current state from Jira so the summary always reflects live data.
+      //    Non-fatal — if Jira is unreachable we fall back to the DB cache.
+      const jiraInstall = await prisma.jiraWorkspaceInstall.findFirst({ where: { workspaceId } });
+      if (jiraInstall) {
+        try {
+          const jiraClient = new JiraClient(jiraInstall.jiraSiteUrl, jiraInstall.sharedSecret);
+          const freshIssue = await jiraClient.getIssue(issueKey);
+          await prisma.issue.update({
+            where: { id: issue.id },
+            data: {
+              title: freshIssue.summary,
+              status: freshIssue.status.name,
+              statusCategory: freshIssue.status.statusCategory.key,
+              assigneeJiraAccountId: freshIssue.assignee?.accountId ?? null,
+              assigneeDisplayName: freshIssue.assignee?.displayName ?? null,
+              priority: freshIssue.priority?.name ?? null,
+            },
+          });
+        } catch (jiraErr) {
+          logger.warn({ err: jiraErr, issueKey }, '[brief] Jira refresh failed, using cached issue state');
+        }
+      }
+
+      // 6. Generate a fresh summary now and respond immediately
       const result = await generateSummary(prisma, issue.id, 'manual_request', { force: true });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -31,13 +31,20 @@ export function analyzeStatus(
 } {
   const importantEvents = events.filter((e) => IMPORTANT_EVENT_TYPES.has(e.eventType));
 
-  // Sort descending by time, take last 5
-  const sorted = [...importantEvents].sort(
+  // Show the most recent event per field type (not a flat top-5) so that
+  // repeated flip-flops on the same field collapse to a single entry.
+  const latestByType = new Map<string, IssueEventRecord>();
+  for (const eventType of IMPORTANT_EVENT_TYPES) {
+    const latest = importantEvents
+      .filter((e) => e.eventType === eventType)
+      .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())[0];
+    if (latest) latestByType.set(eventType, latest);
+  }
+  const deduped = [...latestByType.values()].sort(
     (a, b) => b.occurredAt.getTime() - a.occurredAt.getTime(),
   );
-  const top5 = sorted.slice(0, 5);
 
-  const latestImportantChanges = top5.map((e) => {
+  const latestImportantChanges = deduped.map((e) => {
     const fields = e.changedFields ?? {};
     const from =
       typeof fields['from'] === 'string' || fields['from'] === null
