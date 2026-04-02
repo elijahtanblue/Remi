@@ -6,6 +6,15 @@ import { createGeminiClient, createOpenAiClient, runExtraction, runSnapshot, app
 import { config } from '../config.js';
 import { v4 as uuidv4 } from 'uuid';
 
+/** Recursively extracts plain text from Atlassian Document Format (ADF) nodes. */
+function extractAdfText(node: unknown): string {
+  if (!node || typeof node !== 'object') return '';
+  const n = node as Record<string, unknown>;
+  if (typeof n.text === 'string') return n.text;
+  const children = Array.isArray(n.content) ? n.content : [];
+  return (children as unknown[]).map(extractAdfText).filter(Boolean).join(' ');
+}
+
 function getClients() {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
   if (!config.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set');
@@ -27,7 +36,29 @@ export async function handleMemoryExtract(message: MemoryExtractMessage, queue: 
   } else {
     const event = await prisma.issueEvent.findUnique({ where: { id: sourceId } });
     if (!event) { console.warn(`[memory-extract] IssueEvent ${sourceId} not found`); return; }
-    messageText = JSON.stringify(event.changedFields ?? {});
+
+    const rawPayload = event.rawPayload as Record<string, unknown> | null;
+
+    if (event.eventType === 'comment_created' || event.eventType === 'comment_updated') {
+      // Extract comment body — Jira sends ADF (object) or plain string
+      const comment = rawPayload?.comment as Record<string, unknown> | undefined;
+      const body = comment?.body;
+      messageText = typeof body === 'string' ? body : extractAdfText(body);
+    } else {
+      // issue_created / status_changed / assignee_changed etc.
+      const parts: string[] = [];
+      const changedStr = JSON.stringify(event.changedFields ?? {});
+      if (changedStr !== '{}') parts.push(`Change: ${changedStr}`);
+
+      if (event.eventType === 'issue_created') {
+        const fields = ((rawPayload?.issue as Record<string, unknown> | undefined)?.fields) as Record<string, unknown> | undefined;
+        const desc = fields?.description;
+        const descText = typeof desc === 'string' ? desc : extractAdfText(desc);
+        if (descText.trim()) parts.push(`Description: ${descText}`);
+      }
+
+      messageText = parts.join('\n');
+    }
   }
 
   if (!messageText.trim()) { console.log(`[memory-extract] Empty message text for ${sourceId}, skipping`); return; }

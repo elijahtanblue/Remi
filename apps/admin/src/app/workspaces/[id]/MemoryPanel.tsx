@@ -1,9 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface MemoryConfig {
   enabled: boolean;
+}
+
+interface Proposal {
+  id: string;
+  status: string;
+  confidence: number;
+  createdAt: string;
+  payload: { jiraIssueKey: string; commentBody: string };
+  memoryUnit: { scopeRef: string; issueId: string | null };
 }
 
 export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
@@ -12,12 +21,23 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
   const [backfillStatus, setBackfillStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [backfillResult, setBackfillResult] = useState<{ enqueuedJobs: number; linksProcessed: number } | null>(null);
 
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposalActionStatus, setProposalActionStatus] = useState<Record<string, 'loading' | 'error'>>({});
+
+  const fetchProposals = useCallback(() => {
+    fetch(`/api/admin/memory/proposals/${workspaceId}`)
+      .then((r) => r.json())
+      .then((data) => setProposals(Array.isArray(data) ? data : []))
+      .catch(() => setProposals([]));
+  }, [workspaceId]);
+
   useEffect(() => {
     fetch(`/api/admin/memory/config/${workspaceId}`)
       .then((r) => r.json())
       .then((data) => setConfig({ enabled: data.enabled ?? false }))
       .catch(() => setConfig({ enabled: false }));
-  }, [workspaceId]);
+    fetchProposals();
+  }, [workspaceId, fetchProposals]);
 
   const handleToggle = async () => {
     if (!config) return;
@@ -48,6 +68,22 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
       setBackfillStatus('done');
     } catch {
       setBackfillStatus('error');
+    }
+  };
+
+  const handleProposalAction = async (proposalId: string, action: 'approve' | 'reject') => {
+    setProposalActionStatus((s) => ({ ...s, [proposalId]: 'loading' }));
+    try {
+      const res = await fetch(`/api/admin/memory/proposals/${proposalId}/${action}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: action === 'approve' ? JSON.stringify({ approvedBy: 'admin' }) : undefined,
+      });
+      if (!res.ok) throw new Error('Request failed');
+      setProposalActionStatus((s) => { const n = { ...s }; delete n[proposalId]; return n; });
+      fetchProposals();
+    } catch {
+      setProposalActionStatus((s) => ({ ...s, [proposalId]: 'error' }));
     }
   };
 
@@ -101,6 +137,57 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
           Memory is active. New Slack messages and Jira events will be processed automatically.
           Use backfill to process existing messages.
         </p>
+      )}
+
+      {/* Pending proposals */}
+      {proposals.length > 0 && (
+        <div style={{ marginTop: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <span style={{ fontWeight: 600, fontSize: '13px' }}>Pending Jira Write-backs</span>
+            <span className="badge badge-yellow">{proposals.length}</span>
+            <button onClick={fetchProposals} style={{ fontSize: '11px', padding: '2px 8px' }}>Refresh</button>
+          </div>
+          {proposals.map((p) => (
+            <div key={p.id} style={{ padding: '12px', border: '1px solid var(--remi-border)', borderRadius: '6px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>{p.payload.jiraIssueKey}</span>
+                <span style={{ fontSize: '11px', color: 'var(--remi-muted)' }}>
+                  confidence {Math.round(p.confidence * 100)}% · {new Date(p.createdAt).toLocaleString()}
+                </span>
+              </div>
+              <pre style={{ fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--remi-surface)', padding: '8px', borderRadius: '4px', marginBottom: '8px', maxHeight: '160px', overflowY: 'auto' }}>
+                {p.payload.commentBody}
+              </pre>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => handleProposalAction(p.id, 'approve')}
+                  disabled={proposalActionStatus[p.id] === 'loading'}
+                  className="badge-green"
+                  style={{ padding: '4px 12px', cursor: 'pointer' }}
+                >
+                  {proposalActionStatus[p.id] === 'loading' ? 'Approving…' : 'Approve & Post to Jira'}
+                </button>
+                <button
+                  onClick={() => handleProposalAction(p.id, 'reject')}
+                  disabled={proposalActionStatus[p.id] === 'loading'}
+                  style={{ padding: '4px 12px', cursor: 'pointer' }}
+                >
+                  Reject
+                </button>
+                {proposalActionStatus[p.id] === 'error' && (
+                  <span style={{ fontSize: '12px', color: 'var(--remi-danger-txt)' }}>Action failed</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {proposals.length === 0 && config?.enabled && (
+        <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--remi-muted)' }}>No pending write-backs.</span>
+          <button onClick={fetchProposals} style={{ fontSize: '11px', padding: '2px 8px' }}>Refresh</button>
+        </div>
       )}
     </div>
   );
