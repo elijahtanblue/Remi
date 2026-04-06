@@ -18,6 +18,10 @@ const schema = z.object({
   SQS_JIRA_EVENTS_URL: z.string().optional(),
   SQS_SUMMARY_JOBS_URL: z.string().optional(),
   SQS_BACKFILL_JOBS_URL: z.string().optional(),
+  SQS_MEMORY_EXTRACT_URL: z.string().optional(),
+  SQS_MEMORY_SNAPSHOT_URL: z.string().optional(),
+  SQS_MEMORY_WRITEBACK_PROPOSE_URL: z.string().optional(),
+  SQS_MEMORY_WRITEBACK_APPLY_URL: z.string().optional(),
   // Storage
   STORAGE_ADAPTER: z.enum(['local', 's3']).default('local'),
   S3_BUCKET: z.string().optional(),

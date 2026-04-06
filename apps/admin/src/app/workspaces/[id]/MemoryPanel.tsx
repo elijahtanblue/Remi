@@ -168,7 +168,7 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
         )}
         {jiraBackfillStatus === 'error' && (
           <span style={{ fontSize: '12px', color: 'var(--remi-danger-txt)' }}>
-            Jira sync failed{jiraBackfillError ? `: ${jiraBackfillError}` : ''}
+            Jira sync failed: {jiraBackfillError || 'Unknown error'}
           </span>
         )}
       </div>
