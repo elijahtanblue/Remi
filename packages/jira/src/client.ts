@@ -3,6 +3,15 @@ import { createJiraJwt } from './auth.js';
 import { JIRA_CONNECT_APP_KEY } from './constants.js';
 import type { JiraIssueData } from './types.js';
 
+/** Recursively extracts plain text from Atlassian Document Format (ADF) nodes. */
+function extractAdfText(node: unknown): string {
+  if (!node || typeof node !== 'object') return '';
+  const n = node as Record<string, unknown>;
+  if (typeof n.text === 'string') return n.text;
+  const children = Array.isArray(n.content) ? n.content : [];
+  return (children as unknown[]).map(extractAdfText).filter(Boolean).join(' ');
+}
+
 interface ChangelogEntry {
   created: string;
   items: Array<{
@@ -118,5 +127,53 @@ export class JiraClient {
         ],
       },
     });
+  }
+
+  /** Fetches the issue description and all comments as plain text strings. */
+  async getIssueContent(issueKey: string): Promise<{ description: string | null; comments: Array<{ id: string; body: string; authorName: string; created: string }> }> {
+    // Fetch description field
+    const issueData = await this.request<{
+      fields: {
+        description: unknown | null;
+      };
+    }>('GET', `/rest/api/3/issue/${issueKey}?fields=description`);
+
+    const rawDesc = issueData.fields.description;
+    const description = rawDesc == null ? null : typeof rawDesc === 'string' ? rawDesc : extractAdfText(rawDesc);
+
+    const comments: Array<{ id: string; body: string; authorName: string; created: string }> = [];
+    let startAt = 0;
+
+    while (true) {
+      const commentData = await this.request<{
+        comments: Array<{
+          id: string;
+          body: unknown;
+          author?: { displayName?: string };
+          created: string;
+        }>;
+        maxResults: number;
+        startAt: number;
+        total: number;
+      }>('GET', `/rest/api/3/issue/${issueKey}/comment?maxResults=100&orderBy=created&startAt=${startAt}`);
+
+      comments.push(
+        ...commentData.comments.map((c) => ({
+          id: c.id,
+          body: typeof c.body === 'string' ? c.body : extractAdfText(c.body),
+          authorName: c.author?.displayName ?? 'Unknown',
+          created: c.created,
+        })),
+      );
+
+      const nextStartAt = commentData.startAt + commentData.comments.length;
+      if (nextStartAt >= commentData.total || commentData.comments.length === 0) {
+        break;
+      }
+
+      startAt = nextStartAt;
+    }
+
+    return { description, comments };
   }
 }

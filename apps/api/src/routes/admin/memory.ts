@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
 import {
   prisma,
   listMemoryUnits,
@@ -10,10 +11,16 @@ import {
   upsertMemoryConfig,
   getMemoryConfig,
   findOrCreateMemoryUnit,
+  createIssueEvent,
 } from '@remi/db';
+import { JiraClient } from '@remi/jira';
 import { QueueNames } from '@remi/shared';
 import type { IQueueProducer } from '@remi/queue';
 import { v4 as uuidv4 } from 'uuid';
+
+function hashBackfillText(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 16);
+}
 
 export async function memoryRoutes(app: FastifyInstance, { queue }: { queue: IQueueProducer }) {
 
@@ -156,4 +163,111 @@ export async function memoryRoutes(app: FastifyInstance, { queue }: { queue: IQu
       return reply.send({ ok: true });
     }
   );
+
+  // POST /admin/memory/backfill-jira/:workspaceId
+  // Fetches description and comments for all linked Jira issues via the Jira API
+  // and enqueues MEMORY_EXTRACT jobs so they feed into Stage 1 extraction.
+  app.post<{ Params: { workspaceId: string } }>('/backfill-jira/:workspaceId', async (req, reply) => {
+    const { workspaceId } = req.params;
+
+    const jiraInstall = await prisma.jiraWorkspaceInstall.findFirst({ where: { workspaceId } });
+    if (!jiraInstall) return reply.status(400).send({ error: 'No Jira install found for workspace' });
+
+    const jiraClient = new JiraClient(jiraInstall.jiraSiteUrl, jiraInstall.sharedSecret);
+
+    // Find all distinct linked issues for this workspace
+    const links = await prisma.issueThreadLink.findMany({
+      where: { unlinkedAt: null, issue: { workspaceId } },
+      include: { issue: true },
+      distinct: ['issueId'],
+    });
+
+    let enqueuedJobs = 0;
+    const issuesProcessed: string[] = [];
+
+    for (const link of links) {
+      const issue = link.issue;
+
+      let content: { description: string | null; comments: Array<{ id: string; body: string; authorName: string; created: string }> };
+      try {
+        content = await jiraClient.getIssueContent(issue.jiraIssueKey);
+      } catch (err) {
+        app.log.warn({ err, issueKey: issue.jiraIssueKey }, '[backfill-jira] Failed to fetch Jira content');
+        continue;
+      }
+
+      // Find memory units linked to this issue
+      const units = await prisma.memoryUnit.findMany({
+        where: { workspaceId, issueId: issue.id },
+      });
+      if (units.length === 0) continue;
+
+      const now = new Date();
+
+      // Create IssueEvent + enqueue MEMORY_EXTRACT for description
+      if (content.description?.trim()) {
+        const descText = content.description.trim();
+        const descKey = `jira-desc-backfill-${issue.id}-${hashBackfillText(descText)}`;
+        let descEvent = await prisma.issueEvent.findUnique({ where: { idempotencyKey: descKey } });
+        if (!descEvent) {
+          descEvent = await createIssueEvent(prisma, {
+            issueId: issue.id,
+            idempotencyKey: descKey,
+            eventType: 'jira_description_sync',
+            source: 'admin_backfill',
+            rawPayload: { text: descText },
+            occurredAt: now,
+          });
+        }
+        for (const unit of units) {
+          const jobKey = uuidv4();
+          await queue.send(QueueNames.MEMORY_EXTRACT, {
+            id: jobKey,
+            idempotencyKey: `memory-extract-${descEvent.id}-${unit.id}`,
+            workspaceId,
+            timestamp: now.toISOString(),
+            type: 'memory_extract',
+            payload: { memoryUnitId: unit.id, sourceType: 'jira_event', sourceId: descEvent.id },
+          });
+          enqueuedJobs++;
+        }
+      }
+
+      // Create IssueEvent + enqueue MEMORY_EXTRACT for each comment
+      for (const comment of content.comments) {
+        const commentText = comment.body.trim();
+        if (!commentText) continue;
+
+        const commentPayloadText = `${comment.authorName}: ${commentText}`;
+        const commentKey = `jira-comment-backfill-${issue.id}-${comment.id}-${hashBackfillText(commentPayloadText)}`;
+        let commentEvent = await prisma.issueEvent.findUnique({ where: { idempotencyKey: commentKey } });
+        if (!commentEvent) {
+          commentEvent = await createIssueEvent(prisma, {
+            issueId: issue.id,
+            idempotencyKey: commentKey,
+            eventType: 'jira_comment_sync',
+            source: 'admin_backfill',
+            rawPayload: { text: commentPayloadText, commentId: comment.id, created: comment.created },
+            occurredAt: new Date(comment.created),
+          });
+        }
+        for (const unit of units) {
+          const jobKey = uuidv4();
+          await queue.send(QueueNames.MEMORY_EXTRACT, {
+            id: jobKey,
+            idempotencyKey: `memory-extract-${commentEvent.id}-${unit.id}`,
+            workspaceId,
+            timestamp: now.toISOString(),
+            type: 'memory_extract',
+            payload: { memoryUnitId: unit.id, sourceType: 'jira_event', sourceId: commentEvent.id },
+          });
+          enqueuedJobs++;
+        }
+      }
+
+      issuesProcessed.push(issue.jiraIssueKey);
+    }
+
+    return reply.send({ ok: true, enqueuedJobs, issuesProcessed });
+  });
 }

@@ -152,9 +152,11 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
           });
 
           // Write assignee to Jira
+          let jiraWriteSucceeded = false;
           if (jiraWriteClient && jiraAccountId) {
             try {
               await jiraWriteClient.updateAssignee(issueKey, jiraAccountId);
+              jiraWriteSucceeded = true;
             } catch {
               // Non-fatal — local DB already updated
             }
@@ -177,9 +179,15 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
             },
           });
 
+          const jiraNote = jiraWriteSucceeded
+            ? ' and updated in Jira'
+            : jiraAccountId
+            ? ' (Jira update failed — check permissions)'
+            : ' (no matching Jira account found — try mentioning their Slack account with @)';
+
           await respond({
             response_type: 'ephemeral',
-            text: `Updated assignee for *${issueKey}* to *${assigneeName}*. Refreshing issue data...`,
+            text: `Assignee for *${issueKey}* set to *${assigneeName}*${jiraNote}.`,
           });
         } else {
           // Look up who originally linked this ticket so we can name them.

@@ -20,6 +20,8 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
   const [toggleStatus, setToggleStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [backfillStatus, setBackfillStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [backfillResult, setBackfillResult] = useState<{ enqueuedJobs: number; linksProcessed: number } | null>(null);
+  const [jiraBackfillStatus, setJiraBackfillStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [jiraBackfillResult, setJiraBackfillResult] = useState<{ enqueuedJobs: number; issuesProcessed: string[] } | null>(null);
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [proposalActionStatus, setProposalActionStatus] = useState<Record<string, 'loading' | 'error'>>({});
@@ -68,6 +70,20 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
       setBackfillStatus('done');
     } catch {
       setBackfillStatus('error');
+    }
+  };
+
+  const handleJiraBackfill = async () => {
+    setJiraBackfillStatus('loading');
+    setJiraBackfillResult(null);
+    try {
+      const res = await fetch(`/api/admin/memory/backfill-jira/${workspaceId}`, { method: 'POST' });
+      if (!res.ok) throw new Error('Request failed');
+      const data = await res.json();
+      setJiraBackfillResult({ enqueuedJobs: data.enqueuedJobs, issuesProcessed: data.issuesProcessed ?? [] });
+      setJiraBackfillStatus('done');
+    } catch {
+      setJiraBackfillStatus('error');
     }
   };
 
@@ -129,6 +145,22 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
         )}
         {backfillStatus === 'error' && (
           <span style={{ fontSize: '12px', color: 'var(--remi-danger-txt)' }}>Backfill failed</span>
+        )}
+
+        <button
+          onClick={handleJiraBackfill}
+          disabled={jiraBackfillStatus === 'loading'}
+          style={{ marginLeft: '8px' }}
+        >
+          {jiraBackfillStatus === 'loading' ? 'Syncing…' : 'Sync Jira Content'}
+        </button>
+        {jiraBackfillStatus === 'done' && jiraBackfillResult && (
+          <span className="badge badge-green" style={{ fontSize: '12px' }}>
+            {jiraBackfillResult.enqueuedJobs} jobs for {jiraBackfillResult.issuesProcessed.join(', ')}
+          </span>
+        )}
+        {jiraBackfillStatus === 'error' && (
+          <span style={{ fontSize: '12px', color: 'var(--remi-danger-txt)' }}>Jira sync failed</span>
         )}
       </div>
 

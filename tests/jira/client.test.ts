@@ -54,4 +54,100 @@ describe('JiraClient', () => {
     const expectedQsh = createHash('sha256').update(canonicalRequest).digest('hex');
     expect(payload.qsh).toBe(expectedQsh);
   });
+
+  it('fetches all Jira comments and flattens ADF content to plain text', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          fields: {
+            description: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    { type: 'text', text: 'Hello' },
+                    { type: 'text', text: 'world' },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          comments: [
+            {
+              id: 'comment-1',
+              body: {
+                type: 'doc',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'First comment' }],
+                  },
+                ],
+              },
+              author: { displayName: 'Alice' },
+              created: '2026-04-01T00:00:00.000Z',
+            },
+          ],
+          maxResults: 100,
+          startAt: 0,
+          total: 2,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          comments: [
+            {
+              id: 'comment-2',
+              body: 'Second comment',
+              created: '2026-04-02T00:00:00.000Z',
+            },
+          ],
+          maxResults: 100,
+          startAt: 1,
+          total: 2,
+        }),
+      });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new JiraClient('https://example.atlassian.net', SHARED_SECRET);
+    const content = await client.getIssueContent('KAN-1');
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'https://example.atlassian.net/rest/api/3/issue/KAN-1/comment?maxResults=100&orderBy=created&startAt=0',
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      'https://example.atlassian.net/rest/api/3/issue/KAN-1/comment?maxResults=100&orderBy=created&startAt=1',
+    );
+    expect(content).toEqual({
+      description: 'Hello world',
+      comments: [
+        {
+          id: 'comment-1',
+          body: 'First comment',
+          authorName: 'Alice',
+          created: '2026-04-01T00:00:00.000Z',
+        },
+        {
+          id: 'comment-2',
+          body: 'Second comment',
+          authorName: 'Unknown',
+          created: '2026-04-02T00:00:00.000Z',
+        },
+      ],
+    });
+  });
 });

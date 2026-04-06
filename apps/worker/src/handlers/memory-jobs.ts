@@ -39,7 +39,10 @@ export async function handleMemoryExtract(message: MemoryExtractMessage, queue: 
 
     const rawPayload = event.rawPayload as Record<string, unknown> | null;
 
-    if (event.eventType === 'comment_created' || event.eventType === 'comment_updated') {
+    if (event.eventType === 'jira_description_sync' || event.eventType === 'jira_comment_sync') {
+      // Synthetic events created by the Jira content backfill — text is stored directly in rawPayload
+      messageText = (rawPayload?.text as string | undefined) ?? '';
+    } else if (event.eventType === 'comment_created' || event.eventType === 'comment_updated') {
       // Extract comment body — Jira sends ADF (object) or plain string
       const comment = rawPayload?.comment as Record<string, unknown> | undefined;
       const body = comment?.body;
