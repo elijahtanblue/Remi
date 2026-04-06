@@ -170,24 +170,26 @@ export async function memoryRoutes(app: FastifyInstance, { queue }: { queue: IQu
   app.post<{ Params: { workspaceId: string } }>('/backfill-jira/:workspaceId', async (req, reply) => {
     const { workspaceId } = req.params;
 
+    try {
     const jiraInstall = await prisma.jiraWorkspaceInstall.findFirst({ where: { workspaceId } });
     if (!jiraInstall) return reply.status(400).send({ error: 'No Jira install found for workspace' });
 
     const jiraClient = new JiraClient(jiraInstall.jiraSiteUrl, jiraInstall.sharedSecret);
 
-    // Find all distinct linked issues for this workspace
-    const links = await prisma.issueThreadLink.findMany({
+    // Get distinct issueIds separately to avoid Prisma distinct+include limitations
+    const uniqueLinkRows = await prisma.issueThreadLink.findMany({
       where: { unlinkedAt: null, issue: { workspaceId } },
-      include: { issue: true },
       distinct: ['issueId'],
+      select: { issueId: true },
+    });
+    const issues = await prisma.issue.findMany({
+      where: { id: { in: uniqueLinkRows.map((r) => r.issueId) } },
     });
 
     let enqueuedJobs = 0;
     const issuesProcessed: string[] = [];
 
-    for (const link of links) {
-      const issue = link.issue;
-
+    for (const issue of issues) {
       let content: { description: string | null; comments: Array<{ id: string; body: string; authorName: string; created: string }> };
       try {
         content = await jiraClient.getIssueContent(issue.jiraIssueKey);
@@ -269,5 +271,10 @@ export async function memoryRoutes(app: FastifyInstance, { queue }: { queue: IQu
     }
 
     return reply.send({ ok: true, enqueuedJobs, issuesProcessed });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      app.log.error({ err, workspaceId }, '[backfill-jira] Unexpected error');
+      return reply.status(500).send({ error: message });
+    }
   });
 }

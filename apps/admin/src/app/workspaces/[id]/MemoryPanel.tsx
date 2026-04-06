@@ -22,6 +22,7 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
   const [backfillResult, setBackfillResult] = useState<{ enqueuedJobs: number; linksProcessed: number } | null>(null);
   const [jiraBackfillStatus, setJiraBackfillStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [jiraBackfillResult, setJiraBackfillResult] = useState<{ enqueuedJobs: number; issuesProcessed: string[] } | null>(null);
+  const [jiraBackfillError, setJiraBackfillError] = useState<string | null>(null);
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [proposalActionStatus, setProposalActionStatus] = useState<Record<string, 'loading' | 'error'>>({});
@@ -76,13 +77,19 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
   const handleJiraBackfill = async () => {
     setJiraBackfillStatus('loading');
     setJiraBackfillResult(null);
+    setJiraBackfillError(null);
     try {
       const res = await fetch(`/api/admin/memory/backfill-jira/${workspaceId}`, { method: 'POST' });
-      if (!res.ok) throw new Error('Request failed');
       const data = await res.json();
+      if (!res.ok) {
+        setJiraBackfillError(data.error ?? 'Unknown error');
+        setJiraBackfillStatus('error');
+        return;
+      }
       setJiraBackfillResult({ enqueuedJobs: data.enqueuedJobs, issuesProcessed: data.issuesProcessed ?? [] });
       setJiraBackfillStatus('done');
-    } catch {
+    } catch (e) {
+      setJiraBackfillError(e instanceof Error ? e.message : 'Network error');
       setJiraBackfillStatus('error');
     }
   };
@@ -160,7 +167,9 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
           </span>
         )}
         {jiraBackfillStatus === 'error' && (
-          <span style={{ fontSize: '12px', color: 'var(--remi-danger-txt)' }}>Jira sync failed</span>
+          <span style={{ fontSize: '12px', color: 'var(--remi-danger-txt)' }}>
+            Jira sync failed{jiraBackfillError ? `: ${jiraBackfillError}` : ''}
+          </span>
         )}
       </div>
 
