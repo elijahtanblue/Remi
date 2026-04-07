@@ -2,7 +2,7 @@ import type { MemoryModelClient } from './interface.js';
 import { MODELS } from '../models.js';
 
 const MAX_RETRIES = 4;
-const BASE_DELAY_MS = 5000; // 5 s — free tier allows 15 RPM, so space retries out
+const BASE_DELAY_MS = 2000; // 2 s base — paid tier allows 1000+ RPM; jitter handles burst collisions
 const INITIAL_JITTER_MS = 3000; // 0–3 s to stagger concurrent callers on startup
 
 function isRateLimitError(err: unknown): boolean {

@@ -24,3 +24,4 @@ settings.local.json
 .pem keys/gcp-keys.json
 TROUBLESHOOTING.md
 /scripts
+docs/ARCHITECTURE_INFRASTRUCTURE_PRIVATE.md
