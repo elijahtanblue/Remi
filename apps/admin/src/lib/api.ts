@@ -10,6 +10,26 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface SummaryIssueRef {
+  id: string;
+  workspaceId: string;
+  jiraIssueKey: string;
+  issueType: string | null;
+}
+
+export interface AdminSummary {
+  id: string;
+  issueId: string;
+  version: number;
+  status: string;
+  content: unknown;
+  triggerReason: string;
+  inputHash: string;
+  generatedAt: string;
+  summaryRunId: string | null;
+  issue: SummaryIssueRef;
+}
+
 export interface DeadLetterItem {
   id: string;
   messageId: string | null;
@@ -47,10 +67,10 @@ export function buildDeadLetterListPath(params?: DeadLetterListParams) {
 export const api = {
   getWorkspaces: () => apiFetch<{ workspaces: any[] }>('/admin/workspaces'),
   getSummaries: (workspaceId: string, params?: { limit?: number; offset?: number }) =>
-    apiFetch<{ summaries: any[] }>(
+    apiFetch<{ summaries: AdminSummary[] }>(
       `/admin/workspaces/${workspaceId}/summaries?limit=${params?.limit ?? 20}&offset=${params?.offset ?? 0}`
     ),
-  getSummary: (id: string) => apiFetch<{ summary: any }>(`/admin/summaries/${id}`),
+  getSummary: (id: string) => apiFetch<{ summary: AdminSummary | null }>(`/admin/summaries/${id}`),
   rerunSummary: (id: string) =>
     apiFetch<{ ok: boolean }>(`/admin/summaries/${id}/rerun`, { method: 'POST' }),
   getDeadLetters: (params?: DeadLetterListParams) =>

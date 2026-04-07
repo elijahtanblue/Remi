@@ -1,5 +1,18 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 
+const summaryIssueReferenceSelect = {
+  id: true,
+  workspaceId: true,
+  jiraIssueKey: true,
+  issueType: true,
+} satisfies Prisma.IssueSelect;
+
+const summaryWithIssueReference = {
+  issue: {
+    select: summaryIssueReferenceSelect,
+  },
+} satisfies Prisma.SummaryInclude;
+
 export async function createSummary(
   prisma: PrismaClient,
   data: {
@@ -39,7 +52,10 @@ export async function findCurrentSummary(prisma: PrismaClient, issueId: string) 
 }
 
 export async function findSummaryById(prisma: PrismaClient, id: string) {
-  return prisma.summary.findUnique({ where: { id } });
+  return prisma.summary.findUnique({
+    where: { id },
+    include: summaryWithIssueReference,
+  });
 }
 
 export async function listSummariesByWorkspace(
@@ -52,6 +68,7 @@ export async function listSummariesByWorkspace(
     take: opts?.limit ?? 50,
     skip: opts?.offset ?? 0,
     orderBy: { generatedAt: 'desc' },
+    include: summaryWithIssueReference,
   });
 }
 

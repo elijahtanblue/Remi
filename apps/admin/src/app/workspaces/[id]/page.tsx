@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { api, type AdminSummary } from '@/lib/api';
 import Link from 'next/link';
 import { RerunButton } from './RerunButton';
 import { MemoryPanel } from './MemoryPanel';
@@ -12,7 +12,7 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
   const { id } = await params;
   const { tab = 'summaries' } = await searchParams;
 
-  let summaries: any[] = [];
+  let summaries: AdminSummary[] = [];
   let logs: any[] = [];
   let workspaceName = id;
   let error: string | null = null;
@@ -36,12 +36,10 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
 
   return (
     <div>
-      {/* Breadcrumb */}
       <div className="breadcrumb">
         <Link href="/workspaces">Workspaces</Link> /
       </div>
 
-      {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700 }}>{workspaceName}</h1>
         <code style={{ fontSize: '12px' }}>{id}</code>
@@ -51,7 +49,6 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
 
       <MemoryPanel workspaceId={id} />
 
-      {/* Tab bar */}
       <div className="tab-strip">
         <Link href={`/workspaces/${id}?tab=summaries`} className={`tab-btn${tab === 'summaries' ? ' active' : ''}`}>
           Summaries <span className="tab-count">{summaries.length}</span>
@@ -61,13 +58,13 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
         </Link>
       </div>
 
-      {/* Summaries tab */}
       {tab === 'summaries' && (
         <div className="table-shell">
           <table>
             <thead>
               <tr>
-                <th>Issue ID</th>
+                <th>Issue</th>
+                <th>Type</th>
                 <th>Trigger Reason</th>
                 <th>Version</th>
                 <th>Generated At</th>
@@ -80,22 +77,29 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
                   <td colSpan={6} className="empty-cell">No summaries found</td>
                 </tr>
               ) : (
-                summaries.map((s) => (
-                  <tr key={s.id}>
+                summaries.map((summary) => (
+                  <tr key={summary.id}>
                     <td>
-                      <code style={{ fontSize: '13px' }}>{s.issueId ?? '—'}</code>
+                      <code style={{ fontSize: '13px' }}>{summary.issue.jiraIssueKey ?? '-'}</code>
                     </td>
                     <td>
-                      <span className="badge badge-yellow">{s.triggerReason ?? '—'}</span>
+                      {summary.issue.issueType ? (
+                        <span className="badge badge-yellow">{summary.issue.issueType}</span>
+                      ) : (
+                        <span style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>-</span>
+                      )}
                     </td>
-                    <td style={{ fontSize: '13px', color: 'var(--remi-muted)' }}>{s.version ?? '—'}</td>
+                    <td>
+                      <span className="badge badge-yellow">{summary.triggerReason ?? '-'}</span>
+                    </td>
+                    <td style={{ fontSize: '13px', color: 'var(--remi-muted)' }}>{summary.version ?? '-'}</td>
                     <td style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>
-                      {s.generatedAt ? new Date(s.generatedAt).toLocaleString() : '—'}
+                      {summary.generatedAt ? new Date(summary.generatedAt).toLocaleString() : '-'}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <RerunButton summaryId={s.id} />
-                        <Link href={`/summaries/${s.id}`} style={{ fontSize: '13px' }}>View</Link>
+                        <RerunButton summaryId={summary.id} />
+                        <Link href={`/summaries/${summary.id}`} style={{ fontSize: '13px' }}>View</Link>
                       </div>
                     </td>
                   </tr>
@@ -106,7 +110,6 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
         </div>
       )}
 
-      {/* Audit Log tab */}
       {tab === 'audit' && (
         <div className="table-shell">
           <table>
@@ -128,17 +131,17 @@ export default async function WorkspaceDetailPage({ params, searchParams }: Prop
                 logs.map((log, i) => (
                   <tr key={log.id ?? i}>
                     <td>
-                      <code style={{ fontSize: '13px' }}>{log.action ?? '—'}</code>
+                      <code style={{ fontSize: '13px' }}>{log.action ?? '-'}</code>
                     </td>
-                    <td style={{ fontSize: '13px' }}>{log.actorType ?? '—'}</td>
+                    <td style={{ fontSize: '13px' }}>{log.actorType ?? '-'}</td>
                     <td style={{ fontSize: '13px' }}>
                       {log.actorDisplay ?? (
-                        <code style={{ fontSize: '12px', color: 'var(--remi-muted)' }}>{log.actorId ?? '—'}</code>
+                        <code style={{ fontSize: '12px', color: 'var(--remi-muted)' }}>{log.actorId ?? '-'}</code>
                       )}
                     </td>
-                    <td style={{ fontSize: '13px' }}>{log.target ?? log.targetId ?? '—'}</td>
+                    <td style={{ fontSize: '13px' }}>{log.target ?? log.targetId ?? '-'}</td>
                     <td style={{ color: 'var(--remi-muted)', fontSize: '13px' }}>
-                      {log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}
+                      {log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}
                     </td>
                   </tr>
                 ))

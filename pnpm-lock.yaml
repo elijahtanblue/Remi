@@ -199,6 +199,9 @@ importers:
       '@remi/db':
         specifier: workspace:*
         version: link:../db
+      '@remi/queue':
+        specifier: workspace:*
+        version: link:../queue
       '@remi/shared':
         specifier: workspace:*
         version: link:../shared
@@ -208,6 +211,9 @@ importers:
       googleapis:
         specifier: ^144.0.0
         version: 144.0.0
+      uuid:
+        specifier: ^11.0.0
+        version: 11.1.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

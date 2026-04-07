@@ -38,7 +38,7 @@ describe('parseExtractionResponse', () => {
   it('filters out observations below minimum confidence', () => {
     const raw = JSON.stringify({
       observations: [
-        { category: 'decision', content: 'Maybe we will use React', confidence: 0.3, citationIds: [] },
+        { category: 'decision', content: 'Maybe we will use React', confidence: 0.29, citationIds: [] },
         { category: 'blocker', content: 'Auth is blocked', confidence: 0.85, citationIds: ['msg2'] },
       ],
     });

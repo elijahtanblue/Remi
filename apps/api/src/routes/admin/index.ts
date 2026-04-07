@@ -24,6 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { validateGmailConfigBody } from './gmail-config.js';
 import { memoryRoutes } from './memory.js';
 import { parseDeadLetterDeleteQuery, parseDeadLetterListQuery } from './dead-letter-query.js';
+import { serializeAdminSummary, serializeAdminSummaries, type SummaryWithIssueRecord } from './summary-response.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   await app.register(memoryRoutes, { prefix: '/memory', queue });
@@ -77,14 +78,14 @@ export async function adminRoutes(app: FastifyInstance) {
       limit: Number(limit),
       offset: Number(offset),
     });
-    return { summaries };
+    return { summaries: serializeAdminSummaries(summaries as SummaryWithIssueRecord[]) };
   });
 
   // GET /admin/summaries/:id
   app.get('/summaries/:id', async (request) => {
     const { id } = request.params as { id: string };
     const summary = await findSummaryById(prisma, id);
-    return { summary };
+    return { summary: serializeAdminSummary(summary as SummaryWithIssueRecord | null) };
   });
 
   // POST /admin/summaries/:id/rerun

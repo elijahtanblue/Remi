@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { api, type AdminSummary } from '@/lib/api';
 import Link from 'next/link';
 import { RerunButton } from '@/app/workspaces/[id]/RerunButton';
 
@@ -9,7 +9,7 @@ interface Props {
 export default async function SummaryDetailPage({ params }: Props) {
   const { id } = await params;
 
-  let summary: any = null;
+  let summary: AdminSummary | null = null;
   let error: string | null = null;
 
   try {
@@ -37,18 +37,16 @@ export default async function SummaryDetailPage({ params }: Props) {
     );
   }
 
-  const workspaceSummariesHref = summary.workspaceId
-    ? `/workspaces/${summary.workspaceId}?tab=summaries`
+  const workspaceSummariesHref = summary.issue.workspaceId
+    ? `/workspaces/${summary.issue.workspaceId}?tab=summaries`
     : '/workspaces';
 
   return (
     <div>
-      {/* Breadcrumb */}
       <div className="breadcrumb">
         <Link href={workspaceSummariesHref}>Workspace Summaries</Link> /
       </div>
 
-      {/* Header */}
       <div
         style={{
           display: 'flex',
@@ -59,14 +57,13 @@ export default async function SummaryDetailPage({ params }: Props) {
       >
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
-            {summary.issueId ?? 'Summary'}
+            {summary.issue.jiraIssueKey ?? 'Summary'}
           </h1>
           <code style={{ fontSize: '12px' }}>{id}</code>
         </div>
         <RerunButton summaryId={id} />
       </div>
 
-      {/* Meta card */}
       <div
         className="card"
         style={{
@@ -76,17 +73,17 @@ export default async function SummaryDetailPage({ params }: Props) {
           gap: '16px',
         }}
       >
-        <MetaField label="Issue Key" value={summary.issueId ?? '—'} mono />
-        <MetaField label="Trigger Reason" value={summary.triggerReason ?? '—'} />
-        <MetaField label="Version" value={summary.version ?? '—'} />
+        <MetaField label="Issue Key" value={summary.issue.jiraIssueKey ?? '-'} mono />
+        <MetaField label="Issue Type" value={summary.issue.issueType ?? '-'} />
+        <MetaField label="Trigger Reason" value={summary.triggerReason ?? '-'} />
+        <MetaField label="Version" value={String(summary.version ?? '-')} />
         <MetaField
           label="Generated At"
-          value={summary.generatedAt ? new Date(summary.generatedAt).toLocaleString() : '—'}
+          value={summary.generatedAt ? new Date(summary.generatedAt).toLocaleString() : '-'}
         />
-        <MetaField label="Workspace ID" value={summary.workspaceId ?? '—'} mono />
+        <MetaField label="Workspace ID" value={summary.issue.workspaceId ?? '-'} mono />
       </div>
 
-      {/* Raw content */}
       <div className="table-shell">
         <div className="card-section-header">Raw Content</div>
         <pre style={{ margin: 0, borderRadius: 0, border: 'none' }}>
