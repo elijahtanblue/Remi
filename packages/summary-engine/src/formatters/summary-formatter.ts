@@ -48,8 +48,8 @@ export function formatSummary(
   };
 
   const currentStatus =
-    issue.status ??
     STATUS_CATEGORY_LABEL[issue.statusCategory ?? ''] ??
+    issue.status ??
     'Unknown';
 
   return {
