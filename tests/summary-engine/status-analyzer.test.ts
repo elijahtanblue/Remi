@@ -53,12 +53,13 @@ describe('analyzeStatus', () => {
     expect(latestImportantChanges[0].field).toBe('Status');
   });
 
-  it('caps important changes at 5 most recent', () => {
+  it('dedupes repeated changes on the same field to the most recent event', () => {
     const events = Array.from({ length: 8 }, (_, i) =>
       makeEvent('status_changed', i + 1, { from: 'old', to: 'new' }),
     );
     const { latestImportantChanges } = analyzeStatus(events, [], NOW);
-    expect(latestImportantChanges).toHaveLength(5);
+    expect(latestImportantChanges).toHaveLength(1);
+    expect(latestImportantChanges[0].field).toBe('Status');
   });
 
   it('maps eventType to human-readable field label', () => {

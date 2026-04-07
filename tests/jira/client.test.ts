@@ -150,4 +150,41 @@ describe('JiraClient', () => {
       ],
     });
   });
+
+  it('sends multiline Jira comments as separate ADF paragraphs', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new JiraClient('https://example.atlassian.net', SHARED_SECRET);
+    await client.addComment('KAN-1', 'Remi Memory Update\nCurrent state: Waiting on vendor\n- Follow up');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as {
+      body: {
+        type: string;
+        version: number;
+        content: Array<{ type: string; content: Array<{ type: string; text: string }> }>;
+      };
+    };
+
+    expect(body.body.type).toBe('doc');
+    expect(body.body.content).toHaveLength(3);
+    expect(body.body.content[0]).toEqual({
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Remi Memory Update' }],
+    });
+    expect(body.body.content[1]).toEqual({
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Current state: Waiting on vendor' }],
+    });
+    expect(body.body.content[2]).toEqual({
+      type: 'paragraph',
+      content: [{ type: 'text', text: '- Follow up' }],
+    });
+  });
 });

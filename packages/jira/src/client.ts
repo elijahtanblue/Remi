@@ -23,6 +23,14 @@ interface ChangelogEntry {
   }>;
 }
 
+function buildAdfParagraphsFromPlainText(body: string) {
+  const lines = body.replace(/\r\n/g, '\n').split('\n');
+  return lines.map((line) => ({
+    type: 'paragraph',
+    content: line ? [{ type: 'text', text: line }] : [],
+  }));
+}
+
 export class JiraClient {
   constructor(
     private baseUrl: string,
@@ -119,12 +127,7 @@ export class JiraClient {
       body: {
         type: 'doc',
         version: 1,
-        content: [
-          {
-            type: 'paragraph',
-            content: [{ type: 'text', text: body }],
-          },
-        ],
+        content: buildAdfParagraphsFromPlainText(body),
       },
     });
   }

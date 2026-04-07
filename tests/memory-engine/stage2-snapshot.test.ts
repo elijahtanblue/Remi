@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildSnapshotPrompt, parseSnapshotResponse } from '../../packages/memory-engine/src/pipeline/stage2-snapshot.js';
+import {
+  buildSnapshotPrompt,
+  mergeDataSources,
+  parseSnapshotResponse,
+} from '../../packages/memory-engine/src/pipeline/stage2-snapshot.js';
 
 describe('buildSnapshotPrompt', () => {
   it('returns a string containing key schema fields', () => {
@@ -22,6 +26,7 @@ describe('parseSnapshotResponse', () => {
     blockers: ['OAuth credentials not received'],
     openQuestions: ['Which OAuth provider to use?'],
     owners: ['alice', 'bob'],
+    dataSources: ['jira', 'slack'],
     confidence: 0.82,
   };
 
@@ -45,5 +50,14 @@ describe('parseSnapshotResponse', () => {
     expect(result.blockers).toEqual([]);
     expect(result.openQuestions).toEqual([]);
     expect(result.owners).toEqual([]);
+    expect(result.dataSources).toEqual([]);
+  });
+});
+
+describe('mergeDataSources', () => {
+  it('keeps snapshot provenance stable across prior, new, and model-provided sources', () => {
+    expect(
+      mergeDataSources(['jira'], ['slack', 'jira', undefined], ['email', 'slack']),
+    ).toEqual(['jira', 'slack', 'email']);
   });
 });

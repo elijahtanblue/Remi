@@ -47,10 +47,15 @@ export function formatSummary(
     done: 'Done',
   };
 
+  const currentStatus =
+    issue.status ??
+    STATUS_CATEGORY_LABEL[issue.statusCategory ?? ''] ??
+    'Unknown';
+
   return {
     issueKey: issue.jiraIssueKey,
     issueTitle: issue.title,
-    currentStatus: STATUS_CATEGORY_LABEL[issue.statusCategory ?? ''] ?? issue.status ?? 'Unknown',
+    currentStatus,
     assignee: issue.assigneeDisplayName ?? issue.assigneeJiraAccountId ?? null,
     previousAssignee: analysis.previousAssignee,
     latestImportantChanges,

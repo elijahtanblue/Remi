@@ -28,6 +28,18 @@ function normalizeStringArray(value: unknown): string[] {
   );
 }
 
+export function mergeDataSources(
+  priorDataSources: unknown,
+  newObservationSources: Array<string | null | undefined>,
+  modelDataSources: unknown,
+): string[] {
+  return normalizeStringArray([
+    ...normalizeStringArray(priorDataSources),
+    ...newObservationSources,
+    ...normalizeStringArray(modelDataSources),
+  ]);
+}
+
 function normalizeOpenActions(value: unknown): SnapshotResult['openActions'] {
   if (!Array.isArray(value)) return [];
 
@@ -89,7 +101,7 @@ Source weighting guidance:
 - "email" observations often contain external stakeholder context, commitments, or escalations — treat as high-signal for blockers, open actions, and deadlines
 - When observations from multiple sources agree, increase confidence
 - When sources conflict, prefer the more recent observation; note material conflicts in currentState
-- dataSources: list the unique sourceApp values that contributed to this snapshot (e.g. ["slack", "jira", "email"])
+- dataSources: list the unique sourceApp values still reflected in the current snapshot, including still-relevant prior sources and new evidence (e.g. ["slack", "jira", "email"])
 
 Core principles:
 - This is a state reducer, not a chronological recap
@@ -119,7 +131,7 @@ Field guidance:
 - blockers: only active blockers that currently prevent or materially slow work
 - openQuestions: only unresolved questions that affect execution, timing, scope, or ownership
 - owners: only the people or roles who currently own or drive the work
-- dataSources: list of unique sourceApp strings from the newObservations (e.g. ["slack", "jira"])
+- dataSources: list of unique sourceApp strings reflected in the current snapshot after the update
 - confidence: overall confidence in the snapshot as it exists now
 
 Action rules:
@@ -204,6 +216,11 @@ export async function runStage2(
 
   const raw = await client.complete(systemPrompt, userContent);
   const result = parseSnapshotResponse(raw);
+  const dataSources = mergeDataSources(
+    prior?.dataSources,
+    newObservations.map((observation) => observation.sourceApp),
+    result.dataSources,
+  );
   const freshestEvidenceAt = newObservations.reduce(
     (latest, observation) => (observation.extractedAt > latest ? observation.extractedAt : latest),
     prior?.freshness ?? newObservations[0]!.extractedAt,
@@ -218,6 +235,7 @@ export async function runStage2(
   const snapshot = await createSnapshot(prisma, {
     memoryUnitId,
     ...result,
+    dataSources,
     freshness: freshestEvidenceAt,
     modelId: MODELS.STAGE2_SNAPSHOT,
     promptVersion: PROMPT_VERSIONS.STAGE2_SNAPSHOT,

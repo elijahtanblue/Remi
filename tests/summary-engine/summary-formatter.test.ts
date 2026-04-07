@@ -53,12 +53,12 @@ describe('formatSummary', () => {
     expect(result.assignee).toBe('user-alice');
   });
 
-  it('defaults currentStatus to "Unknown" when status is null', () => {
+  it('falls back to statusCategory label when status is null', () => {
     const collected = makeCollected({
       issue: { ...makeCollected().issue, status: null },
     });
     const result = formatSummary(collected, makeAnalysis(), defaultScore);
-    expect(result.currentStatus).toBe('Unknown');
+    expect(result.currentStatus).toBe('In Progress');
   });
 
   it('passes through previousAssignee from analysis', () => {

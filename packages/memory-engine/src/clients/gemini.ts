@@ -1,12 +1,11 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { MemoryModelClient } from './interface.js';
 import { MODELS } from '../models.js';
 
 export function createGeminiClient(apiKey: string): MemoryModelClient {
-  const genai = new GoogleGenerativeAI(apiKey);
-
   return {
     async complete(systemPrompt: string, userContent: string): Promise<string> {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genai = new GoogleGenerativeAI(apiKey);
       const model = genai.getGenerativeModel({
         model: MODELS.STAGE1_EXTRACT,
         systemInstruction: systemPrompt,
