@@ -37,6 +37,27 @@ V1 ships with Gemini 2.5 Flash-Lite (Stage 1) + GPT-5.4 nano (Stages 2–3) at ~
 
 **Trigger**: Run a held-out eval set comparing `/brief` quality between `gpt-5.4-nano` and `gpt-5.4-mini`. Only upgrade if nano's output has measurable quality gaps on real customer threads AND monthly AI spend across the customer base makes the absolute cost delta worthwhile (at 1,000 workspaces: ~$300/month extra).
 
+## Autonomous Memory: Live vs. Backfill Queue Split
+
+Replace the single `memory-extract` queue with two explicit queues:
+- `memory-extract-live` — new Slack/Jira/email events (priority)
+- `memory-extract-backfill` — admin "Sync Jira Content" and historical backfills
+
+**Why deferred**: Requires provisioning two new SQS queues in AWS, new env vars, updated consumer registration, and routing logic in event handlers. The immediate issue (4 concurrent free-tier jobs colliding) is resolved by startup jitter + retry jitter in `gemini.ts`. Queue splitting adds operational priority guarantees at scale, not a correctness fix.
+
+**Trigger**: When live `/brief` responsiveness is noticeably degraded by a concurrent admin backfill run. At current scale (single workspace, ~4 Jira events per sync), the single queue is adequate.
+
+## Autonomous Memory: Transient 429 → Delayed Re-enqueue Instead of Dead-Letter
+
+When Gemini Stage 1 exhausts all in-client retries (4 attempts), the job currently dead-letters permanently. A better model:
+1. Classify exhausted-retry failures as `TransientRateLimitError`
+2. Re-enqueue the same `memory-extract` job with a `DelaySeconds` offset (SQS) rather than dead-lettering
+3. Track a bounded retry counter on the message; only dead-letter after `MAX_RETRY_COUNT` transient failures
+
+**Why deferred**: Requires extending `IQueueProducer` with a `sendDelayed` method, implementing timer-based delay in `MemoryQueueAdapter` and `DelaySeconds` in `SqsQueueAdapter`, a fresh idempotency key per retry (to bypass SQS FIFO dedup), and a retry counter on the message envelope. Minimum a day of careful work. The jitter fix prevents exhaustion in the first place for the current load.
+
+**Trigger**: If dead-lettered memory extract jobs appear in the errors panel after the jitter fix is deployed. At that point the re-enqueue path becomes necessary.
+
 ## Autonomous Memory: DeepSeek Digest/Summary (Cheapest Confirmed Route)
 
 If cost pressure becomes significant at scale, DeepSeek-V3.2 (`deepseek-chat`) with prompt caching is the cheapest confirmed route for Stages 2–3. Estimated cost: ~$0.50/workspace/month (vs $0.55 for current stack).

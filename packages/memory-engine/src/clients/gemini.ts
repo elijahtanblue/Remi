@@ -3,6 +3,7 @@ import { MODELS } from '../models.js';
 
 const MAX_RETRIES = 4;
 const BASE_DELAY_MS = 5000; // 5 s — free tier allows 15 RPM, so space retries out
+const INITIAL_JITTER_MS = 3000; // 0–3 s to stagger concurrent callers on startup
 
 function isRateLimitError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -26,6 +27,9 @@ export function createGeminiClient(apiKey: string): MemoryModelClient {
         generationConfig: { responseMimeType: 'application/json' },
       });
 
+      // Stagger concurrent callers to avoid burst-limit collisions on free tier
+      await new Promise((resolve) => setTimeout(resolve, Math.random() * INITIAL_JITTER_MS));
+
       let lastError: unknown;
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
@@ -36,9 +40,11 @@ export function createGeminiClient(apiKey: string): MemoryModelClient {
         } catch (err) {
           lastError = err;
           if (!isRateLimitError(err) || attempt === MAX_RETRIES) throw err;
-          // Exponential backoff: 5s, 10s, 20s, 40s
-          const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-          console.warn(`[gemini] Rate limited (429), retrying in ${delay / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          // Exponential backoff with jitter to desync concurrent retries
+          const baseDelay = BASE_DELAY_MS * Math.pow(2, attempt);
+          const jitter = Math.floor(Math.random() * BASE_DELAY_MS);
+          const delay = baseDelay + jitter;
+          console.warn(`[gemini] Rate limited (429), retrying in ${Math.round(delay / 1000)}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
