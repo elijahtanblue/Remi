@@ -1,6 +1,6 @@
 // Model IDs — update here to swap models across the pipeline
 export const MODELS = {
-  STAGE1_EXTRACT: 'gemini-2.5-flash-lite',   // Gemini: high-volume per-message extraction
+  STAGE1_EXTRACT: 'gemini-2.0-flash-lite',   // Gemini: high-volume per-message extraction
   STAGE2_SNAPSHOT: 'gpt-5.4-nano',           // OpenAI: snapshot synthesis + /brief
   STAGE3_PROPOSE: 'gpt-5.4',                 // OpenAI: writeback proposal generation
 } as const;
