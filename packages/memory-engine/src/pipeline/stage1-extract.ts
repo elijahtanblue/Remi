@@ -14,29 +14,93 @@ export interface ExtractionResult {
   observations: ExtractionObservation[];
 }
 
-export function buildExtractionPrompt(): string {
-  return `You are an information extraction engine for a workplace operations tool called Remi.
+const OBSERVATION_CATEGORIES = new Set<ExtractionObservation['category']>([
+  'decision',
+  'action_item',
+  'blocker',
+  'open_question',
+  'status_update',
+  'owner_update',
+  'risk',
+]);
 
-Given a message or event from a work tool (Slack message, Jira description, Jira comment, or similar), extract structured observations. Return a JSON object with an "observations" array.
+export function buildExtractionPrompt(): string {
+  return `You are the Stage 1 extraction engine for Remi, an issue-scoped workplace memory system.
+
+Your job is to extract only durable operational deltas from ONE source event. Remi is not storing a transcript. It is storing the minimum reliable facts a teammate would need later to understand the current work state of an issue.
+
+The input JSON contains:
+- sourceId: the ID of the current source event
+- sourceType: the kind of source event
+- sourceContext: description of the source application and format — use this to calibrate extraction
+- message: the source text to extract from
+
+Apply different extraction standards based on sourceContext:
+- Slack messages are conversational — filter social noise aggressively; weight blockers and explicit decisions highly
+- Jira events are structured — preserve field semantics and treat values as authoritative
+- Email messages: treat the subject line as high-signal even if the snippet is short; external stakeholder commitments and escalations carry high weight
+
+Return a JSON object with an "observations" array.
 
 Each observation has:
 - category: one of "decision" | "action_item" | "blocker" | "open_question" | "status_update" | "owner_update" | "risk"
-- content: a clear, concise statement (1-2 sentences, no filler words)
+- content: a clear, concise statement in plain English
 - confidence: a float from 0.0 to 1.0 representing how certain the observation is
-- citationIds: array of source IDs provided in the input
+- citationIds: array of source IDs; it must include sourceId
 
-Rules:
-- Extract what is clearly stated or strongly implied. Short, direct statements warrant high confidence (0.7+).
-- If the message contains no extractable observations, return { "observations": [] }
-- action_item: implies an assignee or explicit next step
-- decision: something agreed or resolved
-- blocker: something preventing progress right now (e.g. "vendor taking too long", "blocked on X", "waiting for Y")
-- open_question: an unresolved question that affects the work
-- status_update: progress reporting with no clear decision or action
-- owner_update: a change in who is responsible for the work
-- risk: a potential future problem not yet materialised
+What is important enough to keep:
+- facts that change the current issue state
+- decisions that affect execution, direction, scope, timing, or priority
+- active blockers or waiting dependencies
+- current ownership or meaningful ownership changes
+- incomplete next steps, commitments, approvals, asks, or follow-ups
+- unresolved questions that materially affect delivery
+- near-term risks that could affect delivery
+- recent changes that explain why the current state is what it is now
+- explicit dates, deadlines, issue keys, names, owners, constraints, or dependencies when stated
 
-Return only valid JSON. No markdown, no explanation outside the JSON object.`;
+What should usually be ignored:
+- greetings, thanks, jokes, reactions, social chatter, or acknowledgements
+- generic coordination with no durable work impact
+- repeated restatements of already-known facts
+- vague brainstorming with no decision, owner, blocker, or next step
+- emotional tone without operational consequence
+- speculative guesses presented as fact
+- formatting noise, quoted text, or repeated context already captured in the same event
+
+Category rules:
+- decision: something was agreed, approved, selected, rejected, or resolved in a way that changes execution
+- action_item: a concrete next step remains to be done; assignee may be explicit or strongly implied
+- blocker: something is actively preventing or materially delaying progress now
+- open_question: an unresolved question is affecting execution, scope, timing, or ownership
+- status_update: a material progress update, regression, completion signal, or state change not better captured as another category
+- owner_update: ownership was assigned, changed, confirmed, handed off, or made newly clear
+- risk: a plausible future problem or dependency that has not fully materialized yet
+
+Extraction rules:
+- Output 0 to 5 observations max
+- Prefer fewer, higher-value observations over many weak ones
+- Each observation must contain exactly one atomic fact
+- Preserve important specifics in content: who, what, by when, and any named dependency
+- Normalize chatty wording into crisp operational statements
+- Resolve pronouns only when the referent is unambiguous within the same event
+- Do not invent names, owners, due dates, rationale, or certainty
+- Do not convert a suggestion into a decision
+- Do not convert a question into an action item unless the event explicitly asks someone to do something
+- Prefer the most operationally specific category when multiple categories seem possible
+- Prefer blocker over status_update when the message clearly says work cannot proceed
+- Prefer owner_update over status_update when the durable change is responsibility
+- Prefer decision over status_update when something was explicitly agreed or resolved
+- If nothing materially changes the work record, return { "observations": [] }
+
+Confidence guidance:
+- 0.90-1.00: explicit and unambiguous
+- 0.75-0.89: strongly implied with little ambiguity
+- 0.50-0.74: plausible but some ambiguity remains
+- 0.30-0.49: weak signal; include only if it still materially changes the work record
+- below 0.30: do not include
+
+Return only valid JSON. No markdown. No explanation.`;
 }
 
 export function parseExtractionResponse(raw: string): ExtractionResult {
@@ -44,29 +108,89 @@ export function parseExtractionResponse(raw: string): ExtractionResult {
   if (!Array.isArray(parsed.observations)) {
     return { observations: [] };
   }
-  const observations = (parsed.observations as ExtractionObservation[]).filter(
-    (o) => typeof o.confidence === 'number' && o.confidence >= MIN_OBSERVATION_CONFIDENCE,
-  );
+
+  const observations = parsed.observations.flatMap((value): ExtractionObservation[] => {
+    if (!value || typeof value !== 'object') return [];
+
+    const observation = value as Record<string, unknown>;
+    const categoryValue = observation.category;
+    const content = typeof observation.content === 'string' ? observation.content.trim() : '';
+    const confidence = typeof observation.confidence === 'number'
+      ? Math.max(0, Math.min(1, observation.confidence))
+      : Number.NaN;
+    const citationIds = Array.isArray(observation.citationIds)
+      ? Array.from(
+          new Set(
+            observation.citationIds.filter(
+              (citationId): citationId is string =>
+                typeof citationId === 'string' && citationId.trim().length > 0,
+            ),
+          ),
+        )
+      : [];
+
+    if (
+      typeof categoryValue !== 'string' ||
+      !OBSERVATION_CATEGORIES.has(categoryValue as ExtractionObservation['category']) ||
+      !content ||
+      !Number.isFinite(confidence) ||
+      confidence < MIN_OBSERVATION_CONFIDENCE
+    ) {
+      return [];
+    }
+
+    return [{
+      category: categoryValue as ExtractionObservation['category'],
+      content,
+      confidence,
+      citationIds,
+    }];
+  }).slice(0, 5);
+
   return { observations };
 }
+
+const SOURCE_APP: Record<string, string> = {
+  slack_message: 'slack',
+  jira_event: 'jira',
+  email_message: 'email',
+};
+
+const SOURCE_CONTEXT: Record<string, string> = {
+  slack_message: 'Slack thread message (conversational; filter social noise aggressively)',
+  jira_event: 'Jira issue event (structured field change, comment, or description)',
+  email_message: 'Email message (subject + snippet; treat subject line as high-signal)',
+};
 
 export async function runStage1(
   prisma: PrismaClient,
   memoryUnitId: string,
   sourceId: string,
-  sourceType: 'slack_message' | 'jira_event',
+  sourceType: 'slack_message' | 'jira_event' | 'email_message',
   messageText: string,
   client: MemoryModelClient,
 ): Promise<ExtractionResult> {
   const systemPrompt = buildExtractionPrompt();
-  const userContent = JSON.stringify({ sourceId, sourceType, message: messageText });
+  const userContent = JSON.stringify({
+    sourceId,
+    sourceType,
+    sourceContext: SOURCE_CONTEXT[sourceType] ?? sourceType,
+    message: messageText,
+  });
 
   const raw = await client.complete(systemPrompt, userContent);
-  const result = parseExtractionResponse(raw);
+  const parsed = parseExtractionResponse(raw);
+  const result: ExtractionResult = {
+    observations: parsed.observations.map((observation) => ({
+      ...observation,
+      citationIds: Array.from(new Set([sourceId, ...observation.citationIds])),
+    })),
+  };
 
   if (result.observations.length > 0) {
     await createObservations(prisma, memoryUnitId, result.observations.map((o) => ({
       ...o,
+      sourceApp: SOURCE_APP[sourceType] ?? sourceType,
       modelId: MODELS.STAGE1_EXTRACT,
       promptVersion: PROMPT_VERSIONS.STAGE1_EXTRACT,
     })));

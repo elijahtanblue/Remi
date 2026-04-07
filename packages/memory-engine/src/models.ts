@@ -1,4 +1,4 @@
-// Model IDs — update here to swap models across the pipeline
+// Model IDs - update here to swap models across the pipeline
 export const MODELS = {
   STAGE1_EXTRACT: 'gemini-2.0-flash-lite',   // Gemini: high-volume per-message extraction
   STAGE2_SNAPSHOT: 'gpt-5.4-nano',           // OpenAI: snapshot synthesis + /brief
@@ -7,9 +7,9 @@ export const MODELS = {
 
 // Bump when system prompts change so artifacts remain replayable
 export const PROMPT_VERSIONS = {
-  STAGE1_EXTRACT: 'v1',
-  STAGE2_SNAPSHOT: 'v1',
-  STAGE3_PROPOSE: 'v1',
+  STAGE1_EXTRACT: 'v4',
+  STAGE2_SNAPSHOT: 'v4',
+  STAGE3_PROPOSE: 'v4',
 } as const;
 
 // Minimum confidence required for a proposal to be surfaced for approval

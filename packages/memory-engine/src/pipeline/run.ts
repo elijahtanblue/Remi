@@ -19,7 +19,7 @@ export async function runExtraction(
   opts: {
     memoryUnitId: string;
     sourceId: string;
-    sourceType: 'slack_message' | 'jira_event';
+    sourceType: 'slack_message' | 'jira_event' | 'email_message';
     messageText: string;
   },
   clients: PipelineClients,

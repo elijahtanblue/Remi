@@ -42,24 +42,56 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
       if (memConfig?.enabled) {
         const units = await prisma.memoryUnit.findMany({
           where: { workspaceId, issueId: issue.id },
-          take: 1,
           orderBy: { updatedAt: 'desc' },
         });
-        const unit = units[0];
-        if (unit) {
-          const snapshot = await getLatestSnapshot(prisma, unit.id);
-          if (snapshot) {
-            const freshness = new Date(snapshot.freshness).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const keyDecisions = Array.isArray(snapshot.keyDecisions) ? (snapshot.keyDecisions as string[]) : [];
-            const openActions = Array.isArray(snapshot.openActions) ? (snapshot.openActions as Array<{ description: string; assignee?: string }>) : [];
-            const blockers = Array.isArray(snapshot.blockers) ? (snapshot.blockers as string[]) : [];
-            const openQuestions = Array.isArray(snapshot.openQuestions) ? (snapshot.openQuestions as string[]) : [];
+
+        if (units.length > 0) {
+          // Fetch all snapshots across all memory units (Slack threads, email threads, etc.)
+          const allSnapshots = (
+            await Promise.all(units.map((u) => getLatestSnapshot(prisma, u.id)))
+          ).filter((s): s is NonNullable<typeof s> => s !== null);
+
+          if (allSnapshots.length > 0) {
+            // Use the highest-confidence snapshot as the base narrative
+            const base = allSnapshots.reduce((best, s) =>
+              s.confidence > best.confidence ? s : best, allSnapshots[0]!
+            );
+
+            // Merge arrays across all snapshots, deduplicating by value
+            const keyDecisions = [...new Set(
+              allSnapshots.flatMap(s => Array.isArray(s.keyDecisions) ? (s.keyDecisions as string[]) : [])
+            )];
+            const blockers = [...new Set(
+              allSnapshots.flatMap(s => Array.isArray(s.blockers) ? (s.blockers as string[]) : [])
+            )];
+            const openQuestions = [...new Set(
+              allSnapshots.flatMap(s => Array.isArray(s.openQuestions) ? (s.openQuestions as string[]) : [])
+            )];
+            // Deduplicate open actions by description (case-insensitive)
+            const seenActions = new Set<string>();
+            const openActions = allSnapshots
+              .flatMap(s => Array.isArray(s.openActions) ? (s.openActions as Array<{ description: string; assignee?: string }>) : [])
+              .filter((a) => {
+                const key = a.description.trim().toLowerCase();
+                if (seenActions.has(key)) return false;
+                seenActions.add(key);
+                return true;
+              });
+            // Collect data sources across all snapshots
+            const dataSources = [...new Set(
+              allSnapshots.flatMap(s => Array.isArray(s.dataSources) ? (s.dataSources as string[]) : [])
+            )];
+
+            const freshness = new Date(base.freshness).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const sourceLabel = dataSources.length > 1
+              ? `Sources: ${dataSources.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')} · `
+              : '';
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const blocks: any[] = [
               { type: 'header', text: { type: 'plain_text', text: `${issueKey} — Memory Brief`, emoji: true } },
-              { type: 'section', text: { type: 'mrkdwn', text: `*${snapshot.headline}*\n${snapshot.currentState}` } },
-              { type: 'context', elements: [{ type: 'mrkdwn', text: `Confidence: ${Math.round(snapshot.confidence * 100)}% · Updated ${freshness}` }] },
+              { type: 'section', text: { type: 'mrkdwn', text: `*${base.headline}*\n${base.currentState}` } },
+              { type: 'context', elements: [{ type: 'mrkdwn', text: `${sourceLabel}Confidence: ${Math.round(base.confidence * 100)}% · Updated ${freshness}` }] },
             ];
 
             if (keyDecisions.length > 0) {
@@ -82,7 +114,7 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
               workspaceId,
               event: 'memory_brief_viewed',
               actorId: command.user_id,
-              properties: { issueKey },
+              properties: { issueKey, unitCount: units.length, sourceCount: allSnapshots.length },
             }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
             await respond({ response_type: 'in_channel', blocks, text: `Memory brief for *${issueKey}*` });
             return;

@@ -1,11 +1,14 @@
-import { prisma, upsertEmailThread, createEmailMessageIfNotExists, createIssueEmailLink, updateMailboxHistoryIds } from '@remi/db';
+import { prisma, upsertEmailThread, createEmailMessageIfNotExists, createIssueEmailLink, updateMailboxHistoryIds, getMemoryConfig, findOrCreateMemoryUnit } from '@remi/db';
 import { createGmailClient } from './client.js';
 import { detectIssueKeys } from './detect-issues.js';
 import { parseParticipants } from './parse-email.js';
 import { sendIssueSuggestionDm } from './slack-dm.js';
 import type { gmail_v1 } from 'googleapis';
+import { QueueNames } from '@remi/shared';
+import type { IQueueProducer } from '@remi/queue';
+import { v4 as uuidv4 } from 'uuid';
 
-export async function syncAllGmailWorkspaces(): Promise<void> {
+export async function syncAllGmailWorkspaces(queue?: IQueueProducer): Promise<void> {
   const installs = await prisma.gmailWorkspaceInstall.findMany({
     where: { uninstalledAt: null },
   });
@@ -24,6 +27,7 @@ export async function syncAllGmailWorkspaces(): Promise<void> {
           install.domain,
           email,
           storedHistoryIds[email] ?? null,
+          queue,
         );
         if (newHistoryId) {
           updatedHistoryIds[email] = newHistoryId;
@@ -54,6 +58,7 @@ async function syncMailbox(
   domain: string,
   emailAddress: string,
   storedHistoryId: string | null,
+  queue?: IQueueProducer,
 ): Promise<string | null> {
   const gmail = createGmailClient(serviceAccountJson, emailAddress);
 
@@ -65,6 +70,7 @@ async function syncMailbox(
         domain,
         gmail,
         storedHistoryId,
+        queue,
       );
     } catch (err: unknown) {
       // historyId expired (404) or invalid (410) — fall through to full scan
@@ -80,7 +86,7 @@ async function syncMailbox(
     }
   }
 
-  return syncMailboxFull(gmailInstallId, workspaceId, domain, gmail);
+  return syncMailboxFull(gmailInstallId, workspaceId, domain, gmail, queue);
 }
 
 /** Incremental sync via users.history.list. Returns new historyId. */
@@ -90,6 +96,7 @@ async function syncMailboxIncremental(
   domain: string,
   gmail: ReturnType<typeof createGmailClient>,
   startHistoryId: string,
+  queue?: IQueueProducer,
 ): Promise<string | null> {
   let pageToken: string | undefined;
   let latestHistoryId: string | null = null;
@@ -120,7 +127,7 @@ async function syncMailboxIncremental(
 
   for (const msgId of messageIds) {
     try {
-      await processMessage(gmailInstallId, workspaceId, domain, gmail, msgId);
+      await processMessage(gmailInstallId, workspaceId, domain, gmail, msgId, queue);
     } catch (err) {
       console.error(`[gmail-sync] Failed to process message ${msgId}:`, err);
     }
@@ -135,6 +142,7 @@ async function syncMailboxFull(
   workspaceId: string,
   domain: string,
   gmail: ReturnType<typeof createGmailClient>,
+  queue?: IQueueProducer,
 ): Promise<string | null> {
   const sevenDaysAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
   let pageToken: string | undefined;
@@ -150,7 +158,7 @@ async function syncMailboxFull(
     for (const msgRef of res.data.messages ?? []) {
       if (!msgRef.id) continue;
       try {
-        await processMessage(gmailInstallId, workspaceId, domain, gmail, msgRef.id);
+        await processMessage(gmailInstallId, workspaceId, domain, gmail, msgRef.id, queue);
       } catch (err) {
         console.error(`[gmail-sync] Failed to process message ${msgRef.id}:`, err);
       }
@@ -170,6 +178,7 @@ async function processMessage(
   domain: string,
   gmail: ReturnType<typeof createGmailClient>,
   messageId: string,
+  queue?: IQueueProducer,
 ): Promise<void> {
   const msgRes = await gmail.users.messages.get({
     userId: 'me',
@@ -229,6 +238,7 @@ async function processMessage(
 
   // Only send DM for issue+thread pairs that are newly linked (first time seen)
   const confirmedIssueKeys: string[] = [];
+  const confirmedIssues: Array<{ id: string; jiraIssueKey: string }> = [];
   for (const issueKey of issueKeys) {
     const issue = await prisma.issue.findFirst({
       where: { workspaceId, jiraIssueKey: issueKey },
@@ -242,6 +252,7 @@ async function processMessage(
     });
     if (created) {
       confirmedIssueKeys.push(issueKey);
+      confirmedIssues.push(issue);
     }
   }
 
@@ -258,6 +269,31 @@ async function processMessage(
         emailSubject: subject || '(no subject)',
         fromEmail,
       });
+    }
+
+    // Enqueue memory extraction for each newly linked issue if memory is enabled
+    if (queue) {
+      const memoryConfig = await getMemoryConfig(prisma, workspaceId);
+      if (memoryConfig?.enabled) {
+        for (const issue of confirmedIssues) {
+          const { unit } = await findOrCreateMemoryUnit(
+            prisma,
+            workspaceId,
+            'email_thread',
+            thread.id,
+            issue.id,
+          );
+          await queue.send(QueueNames.MEMORY_EXTRACT, {
+            id: uuidv4(),
+            idempotencyKey: `memory-extract-email-${emailMsg.id}-${unit.id}`,
+            workspaceId,
+            timestamp: new Date().toISOString(),
+            type: 'memory_extract',
+            payload: { memoryUnitId: unit.id, sourceType: 'email_message', sourceId: emailMsg.id },
+          });
+          console.log(`[gmail-sync] Enqueued memory extraction for email ${emailMsg.id} → unit ${unit.id}`);
+        }
+      }
     }
   }
 

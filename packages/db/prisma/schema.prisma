@@ -437,8 +437,8 @@ model WorkspaceMemoryConfig {
 model MemoryUnit {
   id          String   @id @default(cuid())
   workspaceId String
-  scopeType   String   // 'issue_thread' | 'app_dm'
-  scopeRef    String   // threadId for issue_thread, slackUserId for app_dm
+  scopeType   String   // 'issue_thread' | 'app_dm' | 'email_thread'
+  scopeRef    String   // threadId for issue_thread/email_thread, slackUserId for app_dm
   issueId     String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -462,6 +462,7 @@ model MemoryObservation {
   content       String
   confidence    Float
   citationIds   String[]
+  sourceApp     String?  // 'slack' | 'jira' | 'email' | future apps
   modelId       String
   promptVersion String
   extractedAt   DateTime @default(now())
@@ -483,6 +484,7 @@ model MemorySnapshot {
   blockers      Json
   openQuestions Json
   owners        String[]
+  dataSources   String[] // e.g. ['slack', 'jira', 'email']
   confidence    Float
   freshness     DateTime
   modelId       String

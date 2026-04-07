@@ -33,6 +33,13 @@ export async function handleMemoryExtract(message: MemoryExtractMessage, queue: 
     const msg = await prisma.slackMessage.findUnique({ where: { id: sourceId } });
     if (!msg) { console.warn(`[memory-extract] SlackMessage ${sourceId} not found`); return; }
     messageText = msg.text;
+  } else if (sourceType === 'email_message') {
+    const emailMsg = await prisma.emailMessage.findUnique({ where: { id: sourceId } });
+    if (!emailMsg) { console.warn(`[memory-extract] EmailMessage ${sourceId} not found`); return; }
+    const parts: string[] = [];
+    if (emailMsg.subject?.trim()) parts.push(`Subject: ${emailMsg.subject.trim()}`);
+    if (emailMsg.bodySnippet?.trim()) parts.push(emailMsg.bodySnippet.trim());
+    messageText = parts.join('\n');
   } else {
     const event = await prisma.issueEvent.findUnique({ where: { id: sourceId } });
     if (!event) { console.warn(`[memory-extract] IssueEvent ${sourceId} not found`); return; }

@@ -69,11 +69,11 @@ const GMAIL_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 let gmailSyncTimer: ReturnType<typeof setInterval> | undefined;
 
 if (config.GMAIL_SYNC_ENABLED) {
-  syncAllGmailWorkspaces().catch((err: unknown) =>
+  syncAllGmailWorkspaces(queue).catch((err: unknown) =>
     console.error('[gmail-sync] Initial sync error:', err),
   );
   gmailSyncTimer = setInterval(() => {
-    syncAllGmailWorkspaces().catch((err: unknown) =>
+    syncAllGmailWorkspaces(queue).catch((err: unknown) =>
       console.error('[gmail-sync] Sync error:', err),
     );
   }, GMAIL_SYNC_INTERVAL_MS);

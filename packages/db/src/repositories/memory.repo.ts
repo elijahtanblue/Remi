@@ -23,7 +23,7 @@ export async function upsertMemoryConfig(
 export async function findOrCreateMemoryUnit(
   prisma: PrismaClient,
   workspaceId: string,
-  scopeType: 'issue_thread' | 'app_dm',
+  scopeType: 'issue_thread' | 'app_dm' | 'email_thread',
   scopeRef: string,
   issueId?: string,
 ): Promise<{ unit: NonNullable<Awaited<ReturnType<PrismaClient['memoryUnit']['findUnique']>>>; created: boolean }> {
@@ -68,6 +68,7 @@ export async function createObservations(
     content: string;
     confidence: number;
     citationIds: string[];
+    sourceApp?: string;
     modelId: string;
     promptVersion: string;
   }>,
@@ -116,6 +117,7 @@ export async function createSnapshot(
     blockers: string[];
     openQuestions: string[];
     owners: string[];
+    dataSources: string[];
     confidence: number;
     freshness: Date;
     modelId: string;

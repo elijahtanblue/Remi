@@ -12,9 +12,11 @@
   },
   "dependencies": {
     "@remi/db": "workspace:*",
+    "@remi/queue": "workspace:*",
     "@remi/shared": "workspace:*",
     "@slack/web-api": "^7.8.0",
-    "googleapis": "^144.0.0"
+    "googleapis": "^144.0.0",
+    "uuid": "^11.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

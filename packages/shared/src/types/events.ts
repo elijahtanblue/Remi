@@ -71,7 +71,7 @@ export interface MemoryExtractMessage extends BaseQueueMessage {
   type: 'memory_extract';
   payload: {
     memoryUnitId: string;
-    sourceType: 'slack_message' | 'jira_event';
+    sourceType: 'slack_message' | 'jira_event' | 'email_message';
     sourceId: string;
   };
 }
