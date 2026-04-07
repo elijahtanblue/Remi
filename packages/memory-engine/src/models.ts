@@ -16,4 +16,4 @@ export const PROMPT_VERSIONS = {
 export const MIN_PROPOSAL_CONFIDENCE = 0.65;
 
 // Minimum confidence required for an observation to be included in snapshots
-export const MIN_OBSERVATION_CONFIDENCE = 0.50;
+export const MIN_OBSERVATION_CONFIDENCE = 0.30;

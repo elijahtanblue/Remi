@@ -17,20 +17,20 @@ export interface ExtractionResult {
 export function buildExtractionPrompt(): string {
   return `You are an information extraction engine for a workplace operations tool called Remi.
 
-Given a Slack message, extract structured observations. Return a JSON object with an "observations" array.
+Given a message or event from a work tool (Slack message, Jira description, Jira comment, or similar), extract structured observations. Return a JSON object with an "observations" array.
 
 Each observation has:
 - category: one of "decision" | "action_item" | "blocker" | "open_question" | "status_update" | "owner_update" | "risk"
 - content: a clear, concise statement (1-2 sentences, no filler words)
 - confidence: a float from 0.0 to 1.0 representing how certain the observation is
-- citationIds: array of source message IDs provided in the input
+- citationIds: array of source IDs provided in the input
 
 Rules:
-- Only extract what is clearly stated. Do not infer or speculate.
+- Extract what is clearly stated or strongly implied. Short, direct statements warrant high confidence (0.7+).
 - If the message contains no extractable observations, return { "observations": [] }
 - action_item: implies an assignee or explicit next step
 - decision: something agreed or resolved
-- blocker: something preventing progress right now
+- blocker: something preventing progress right now (e.g. "vendor taking too long", "blocked on X", "waiting for Y")
 - open_question: an unresolved question that affects the work
 - status_update: progress reporting with no clear decision or action
 - owner_update: a change in who is responsible for the work
