@@ -1,7 +1,7 @@
 import { prisma, upsertEmailThread, createEmailMessageIfNotExists, createIssueEmailLink, updateMailboxHistoryIds, getMemoryConfig, findOrCreateMemoryUnit } from '@remi/db';
 import { createGmailClient } from './client.js';
 import { detectIssueKeys } from './detect-issues.js';
-import { parseParticipants } from './parse-email.js';
+import { parseParticipants, extractPlainTextBody } from './parse-email.js';
 import { sendIssueSuggestionDm } from './slack-dm.js';
 import type { gmail_v1 } from 'googleapis';
 import { QueueNames } from '@remi/shared';
@@ -193,8 +193,7 @@ async function processMessage(
   const msgRes = await gmail.users.messages.get({
     userId: 'me',
     id: messageId,
-    format: 'metadata',
-    metadataHeaders: ['From', 'To', 'Cc', 'Subject', 'Date'],
+    format: 'full',
   });
 
   const msg = msgRes.data;
@@ -207,7 +206,9 @@ async function processMessage(
   const cc = getHeader('Cc');
   const subject = getHeader('Subject');
   const dateHeader = getHeader('Date');
-  const snippet = msg.snippet ?? '';
+  // Prefer full plain-text body; fall back to Gmail's auto-generated snippet
+  const fullBody = extractPlainTextBody(msg.payload ?? undefined);
+  const snippet = fullBody || msg.snippet ?? '';
   const gmailThreadId = msg.threadId ?? messageId;
 
   const participants = parseParticipants(from, to, cc);

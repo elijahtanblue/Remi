@@ -61,10 +61,10 @@ startConsumer(queue, QueueNames.MEMORY_WRITEBACK_APPLY, (msg) =>
 console.log(`[worker] Started consuming queues: ${Object.values(QueueNames).join(', ')}`);
 
 // ─── Gmail batch sync ─────────────────────────────────────────────────────────
-// Runs immediately on startup then every 5 minutes.
+// Runs immediately on startup then every 2 minutes.
 // Set GMAIL_SYNC_ENABLED=false on replica workers to prevent concurrent polling.
 // Deduplication is handled by gmailMessageId — re-runs are safe.
-const GMAIL_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const GMAIL_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
 let gmailSyncTimer: ReturnType<typeof setInterval> | undefined;
 
