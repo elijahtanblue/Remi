@@ -3,6 +3,7 @@ import {
   createIssueEvent,
   createSlackMessage,
   findIssueByJiraId,
+  findDepartmentByJiraProjectPrefix,
   mergeIssues,
   PrismaClient as _PrismaClient,
   Prisma,
@@ -71,6 +72,9 @@ async function handleJiraIssueBackfill(
       ? await mergeIssues(prisma, issue.id, existingCanonical.id)
       : issue;
 
+  const projectPrefix = issue.jiraIssueKey.split('-')[0];
+  const department = await findDepartmentByJiraProjectPrefix(prisma, workspaceId, projectPrefix);
+
   await prisma.issue.update({
     where: { id: targetIssue.id },
     data: {
@@ -84,6 +88,7 @@ async function handleJiraIssueBackfill(
       priority: freshIssue.priority?.name ?? null,
       issueType: freshIssue.issuetype.name,
       rawPayload: freshIssue as unknown as Prisma.InputJsonValue,
+      ...(department ? { departmentId: department.id } : {}),
     },
   });
 

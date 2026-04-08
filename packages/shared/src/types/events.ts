@@ -98,6 +98,20 @@ export interface MemoryWritebackApplyMessage extends BaseQueueMessage {
   };
 }
 
+// ─── Doc Generate Job ───
+
+export interface DocGenerateJobMessage extends BaseQueueMessage {
+  type: 'doc_generate_job';
+  payload: {
+    issueId: string;
+    issueKey: string;
+    docType: 'handoff' | 'summary' | 'escalation';
+    /** Slack channel + ts so we can reply with the generated URL */
+    replyChannelId: string;
+    replyThreadTs?: string;
+  };
+}
+
 // ─── Union ───
 
 export type QueueMessage =
@@ -108,4 +122,5 @@ export type QueueMessage =
   | MemoryExtractMessage
   | MemorySnapshotMessage
   | MemoryWritebackProposeMessage
-  | MemoryWritebackApplyMessage;
+  | MemoryWritebackApplyMessage
+  | DocGenerateJobMessage;

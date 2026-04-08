@@ -26,6 +26,7 @@ export default defineConfig({
       '@remi/summary-engine': path.resolve(__dirname, 'packages/summary-engine/src/index.ts'),
       '@remi/email': path.resolve(__dirname, 'packages/email/src/index.ts'),
       '@remi/gmail': path.resolve(__dirname, 'packages/gmail/src/index.ts'),
+      '@remi/confluence': path.resolve(__dirname, 'packages/confluence/src/index.ts'),
     },
   },
 });

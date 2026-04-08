@@ -4,6 +4,7 @@ import {
   createSlackApp,
   registerLinkTicketCommand,
   registerBriefCommand,
+  registerDocCommand,
   registerAttachThreadShortcut,
   registerMessageEvents,
   registerAppHome,
@@ -181,6 +182,7 @@ export async function slackRoutes(app: FastifyInstance) {
   // Register all Bolt handlers
   registerLinkTicketCommand(slackApp, queue);
   registerBriefCommand(slackApp, queue);
+  registerDocCommand(slackApp, queue);
   registerAttachThreadShortcut(slackApp, queue);
   registerMessageEvents(slackApp, queue);
   registerAppHome(slackApp);

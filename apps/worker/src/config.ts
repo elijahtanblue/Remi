@@ -13,6 +13,7 @@ const schema = z.object({
   SQS_MEMORY_SNAPSHOT_URL: z.string().optional(),
   SQS_MEMORY_WRITEBACK_PROPOSE_URL: z.string().optional(),
   SQS_MEMORY_WRITEBACK_APPLY_URL: z.string().optional(),
+  SQS_DOC_GENERATE_JOBS_URL: z.string().optional(),
   SLACK_BOT_TOKEN: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),

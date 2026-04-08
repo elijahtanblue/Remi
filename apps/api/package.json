@@ -16,6 +16,7 @@
     "@remi/jira": "workspace:*",
     "@remi/queue": "workspace:*",
     "@remi/shared": "workspace:*",
+    "@remi/confluence": "workspace:*",
     "@remi/slack": "workspace:*",
     "@remi/summary-engine": "workspace:*",
     "dotenv": "^16.4.0",

@@ -6,9 +6,10 @@ import { handleJiraEvent } from './handlers/jira-events.js';
 import { handleSlackEvent } from './handlers/slack-events.js';
 import { handleSummaryJob } from './handlers/summary-jobs.js';
 import { handleBackfillJob } from './handlers/backfill-jobs.js';
-import type { JiraEventMessage, SlackEventMessage, SummaryJobMessage, BackfillJobMessage } from '@remi/shared';
+import type { JiraEventMessage, SlackEventMessage, SummaryJobMessage, BackfillJobMessage, DocGenerateJobMessage } from '@remi/shared';
 import type { MemoryExtractMessage, MemorySnapshotMessage, MemoryWritebackProposeMessage, MemoryWritebackApplyMessage } from '@remi/shared';
 import { handleMemoryExtract, handleMemorySnapshot, handleMemoryWritebackPropose, handleMemoryWritebackApply } from './handlers/memory-jobs.js';
+import { handleDocGenerateJob } from './handlers/doc-generate-jobs.js';
 import { syncAllGmailWorkspaces } from '@remi/gmail';
 
 const queue =
@@ -24,6 +25,7 @@ const queue =
           [QueueNames.MEMORY_SNAPSHOT]: config.SQS_MEMORY_SNAPSHOT_URL ?? '',
           [QueueNames.MEMORY_WRITEBACK_PROPOSE]: config.SQS_MEMORY_WRITEBACK_PROPOSE_URL ?? '',
           [QueueNames.MEMORY_WRITEBACK_APPLY]: config.SQS_MEMORY_WRITEBACK_APPLY_URL ?? '',
+        [QueueNames.DOC_GENERATE_JOBS]: config.SQS_DOC_GENERATE_JOBS_URL ?? '',
         },
       })
     : new MemoryQueueAdapter();
@@ -56,6 +58,10 @@ startConsumer(queue, QueueNames.MEMORY_WRITEBACK_PROPOSE, (msg) =>
 );
 startConsumer(queue, QueueNames.MEMORY_WRITEBACK_APPLY, (msg) =>
   handleMemoryWritebackApply(msg as MemoryWritebackApplyMessage),
+);
+
+startConsumer(queue, QueueNames.DOC_GENERATE_JOBS, (msg) =>
+  handleDocGenerateJob(msg as DocGenerateJobMessage),
 );
 
 console.log(`[worker] Started consuming queues: ${Object.values(QueueNames).join(', ')}`);

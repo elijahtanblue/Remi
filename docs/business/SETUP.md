@@ -13,6 +13,7 @@ Remi is a Slack-first operational memory layer that links Slack threads to Jira 
 3. When the Jira issue changes (status, assignee, priority) or new messages arrive in the linked thread, Remi regenerates a summary
 4. The summary surfaces via `/brief PROJ-123`, Slack App Home, or an embedded Jira issue panel
 5. Summaries are deterministic — no LLM, fully explainable, fully auditable
+6. `/doc PROJ-123 handoff` assembles a full operational brief and writes a draft Confluence page — timeline, key decisions, blockers, participants, linked threads, and email context all in one place
 
 ---
 
@@ -98,7 +99,7 @@ pnpm dev
 2. Enable **Socket Mode** (under Settings → Socket Mode) — this lets you test locally without a public URL
 3. Under **OAuth & Permissions** → Bot Token Scopes, add:
    `channels:history`, `channels:read`, `chat:write`, `commands`, `im:write`, `users:read`, `users:read.email`, `app_mentions:read`
-4. Under **Slash Commands**, add: `/link-ticket` and `/brief`
+4. Under **Slash Commands**, add: `/link-ticket`, `/brief`, and `/doc`
 5. Under **Event Subscriptions**, add events: `message.channels`, `app_home_opened`
 6. Under **Interactivity & Shortcuts**, add a message shortcut with Callback ID: `attach_to_issue`
 7. Copy into your `.env`:
@@ -253,10 +254,10 @@ postgresql://remi:YOUR_PASSWORD@remi-prod.xxxxxxxxx.ap-southeast-2.rds.amazonaws
 
 > **Your computer's terminal**
 
-Run these commands to create the 4 queues Remi uses:
+Run these commands to create the 5 queues Remi uses:
 
 ```bash
-for queue in slack-events jira-events summary-jobs backfill-jobs; do
+for queue in slack-events jira-events summary-jobs backfill-jobs doc-generate-jobs; do
   aws sqs create-queue \
     --queue-name "remi-${queue}.fifo" \
     --attributes FifoQueue=true,ContentBasedDeduplication=true \
@@ -264,7 +265,7 @@ for queue in slack-events jira-events summary-jobs backfill-jobs; do
 done
 ```
 
-Each command prints a URL — **copy all 4 URLs** and save them. They look like:
+Each command prints a URL — **copy all 5 URLs** and save them. They look like:
 ```
 https://sqs.ap-southeast-2.amazonaws.com/123456789012/remi-slack-events.fifo
 ```
@@ -411,6 +412,7 @@ SQS_SLACK_EVENTS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-slack
 SQS_JIRA_EVENTS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-jira-events.fifo
 SQS_SUMMARY_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
 SQS_BACKFILL_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
+SQS_DOC_GENERATE_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-doc-generate-jobs.fifo
 
 # Storage (S3)
 STORAGE_ADAPTER=s3
@@ -429,6 +431,10 @@ ADMIN_API_KEY=GENERATE_A_LONG_RANDOM_STRING_HERE
 
 # Admin dashboard
 NEXT_PUBLIC_API_URL=https://api.memoremi.com
+
+# Confluence integration (optional)
+CONFLUENCE_CLIENT_ID=
+CONFLUENCE_CLIENT_SECRET=
 ```
 
 **To save and exit nano:** press `Ctrl+X`, then `Y`, then `Enter`.
@@ -557,6 +563,7 @@ Now you'll point your Slack app at your real server and enable the OAuth install
 8. Click **Slash Commands** → edit each command:
    - `/link-ticket` → Request URL: `https://api.memoremi.com/slack/commands`
    - `/brief` → Request URL: `https://api.memoremi.com/slack/commands`
+   - `/doc` → Request URL: `https://api.memoremi.com/slack/commands`
 
 9. Click **Interactivity & Shortcuts** → turn on Interactivity
    - Request URL: `https://api.memoremi.com/slack/interactions`
@@ -801,7 +808,66 @@ You should see the domain and monitored emails returned (service account JSON is
 
 ---
 
-### Step 15: Set up memoremi.com with HTTPS
+### Step 15: Connect Confluence (optional)
+
+Remi can write operational briefs directly to Confluence pages via `/doc ISSUE-KEY [handoff|summary|escalation]`. This requires an Atlassian OAuth 2.0 app.
+
+#### A. Create an Atlassian OAuth app
+
+> **Your web browser → [developer.atlassian.com](https://developer.atlassian.com) → Apps**
+
+1. Click **Create** → **OAuth 2.0 integration**
+2. Name: `Remi`
+3. Under **Permissions**, add **Confluence API** → enable these scopes:
+   - `read:confluence-space.summary`
+   - `write:confluence-content`
+   - `offline_access`
+4. Under **Authorization**, set the Callback URL to:
+   ```
+   https://api.memoremi.com/admin/confluence/callback
+   ```
+5. Note the **Client ID** and **Client Secret** from the app settings page
+
+#### B. Add credentials to your server
+
+Add to `.env.prod` and restart:
+
+```bash
+CONFLUENCE_CLIENT_ID=your-client-id
+CONFLUENCE_CLIENT_SECRET=your-client-secret
+```
+
+```bash
+cd ~/remi
+nano ~/.env.prod   # add the two lines above
+cp ~/.env.prod .env.prod
+docker compose -f docker-compose.prod.yml up -d
+```
+
+#### C. Authorise Remi for your Confluence workspace
+
+> **Any terminal that can reach your running Remi API**
+
+1. Get the OAuth authorisation URL for your workspace:
+   ```bash
+   curl "https://api.memoremi.com/admin/confluence/oauth-url?workspaceId=YOUR_WORKSPACE_ID" \
+     -H "x-admin-key: YOUR_ADMIN_API_KEY"
+   ```
+2. Open the returned URL in a browser — authorise Remi to access your Confluence site
+3. After authorising, you'll be redirected back and the install is saved automatically
+
+#### D. Verify the setup
+
+```bash
+curl https://api.memoremi.com/admin/confluence/YOUR_WORKSPACE_ID \
+  -H "x-admin-key: YOUR_ADMIN_API_KEY"
+```
+
+You should see the `cloudId`, `siteUrl`, and `scopes` returned. Once connected, users can run `/doc PROJ-123 handoff` in any linked Slack channel and Remi will post a Confluence page URL.
+
+---
+
+### Step 16: Set up memoremi.com with HTTPS
 
 This step connects your domain (`memoremi.com`) to your EC2 server and enables HTTPS via Caddy (free, automatic certificates).
 
@@ -890,7 +956,7 @@ The admin app (`apps/admin`) includes a `vercel.json` and can be deployed to Ver
 
 ---
 
-### (Optional) Step 16: Auto-deploy when you push code
+### (Optional) Step 17: Auto-deploy when you push code
 
 GitHub Actions builds your Docker images and deploys them to EC2 automatically on every push to `main`. The workflow file is already in the repo at [.github/workflows/deploy.yml](.github/workflows/deploy.yml). You just need to add secrets.
 
@@ -937,6 +1003,7 @@ packages/
   jira/           Jira Connect auth, REST client, webhook parser, panel
   gmail/          Gmail sync client, issue key detection, Slack DM notifications
   summary-engine/ Deterministic summary generation (no LLM)
+  confluence/     Confluence Cloud REST client, IssueDocContext builder, page renderer
 ```
 
 ---
@@ -946,7 +1013,8 @@ packages/
 Visit `https://admin.memoremi.com` once the app is running (or `http://YOUR_EC2_IP:3001` before DNS is set up).
 
 The admin dashboard shows:
-- All workspaces and their Slack/Jira install status
+- All workspaces and their Slack/Jira/Gmail/Confluence install status
+- Departments — create and manage department mappings (Jira project prefixes → department, Slack channel patterns → department)
 - Recent issue-thread links
 - Summary history with re-run button
 - Failed jobs (dead letters) with retry button
@@ -981,6 +1049,10 @@ Summaries regenerate on: status change, assignee change, priority change, new li
 
 **Workspace-scoped multi-tenancy** — Every table has a `workspaceId` FK. No schema-per-tenant complexity.
 
+**Department isolation** — `Department` groups Jira project prefixes and Slack channel patterns under a user-defined name (e.g. "Engineering", "Marketing"). `departmentId` is nullable on `Issue` and `MemoryUnit` — auto-populated from Jira project key prefix. No access enforcement in V1; the schema investment prevents a painful migration later.
+
+**Confluence doc generation** — `/doc PROJ-123 handoff` assembles `IssueDocContext` from MemorySnapshot + Jira fields + Slack threads + email links and writes a deterministic Confluence page via REST API. No LLM — every field is traceable to a source. The `IssueDocContext` interface decouples the renderer from any specific engine, so the underlying context assembly can change without touching the page writer.
+
 **Jira Connect (not Forge)** — Full control over hosting, webhooks, and iframe panels.
 
 ---
@@ -1003,6 +1075,7 @@ SQS_SLACK_EVENTS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-slack
 SQS_JIRA_EVENTS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-jira-events.fifo
 SQS_SUMMARY_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-summary-jobs.fifo
 SQS_BACKFILL_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-backfill-jobs.fifo
+SQS_DOC_GENERATE_JOBS_URL=https://sqs.ap-southeast-2.amazonaws.com/ACCOUNT/remi-doc-generate-jobs.fifo
 
 # ─── Storage (S3) ───────────────────────────────────────────────────────────
 STORAGE_ADAPTER=s3
@@ -1030,6 +1103,13 @@ ADMIN_API_KEY=<same as above>
 # The service account, domain, and monitored emails are stored in the database
 # via POST /admin/gmail/configure — no additional env vars needed beyond this flag.
 GMAIL_SYNC_ENABLED=true
+
+# ─── Confluence integration (optional) ──────────────────────────────────────
+# Required to enable /doc command and Confluence page generation.
+# Create an OAuth 2.0 app at developer.atlassian.com.
+# Callback URL must be set to: https://<your-api-domain>/admin/confluence/callback
+CONFLUENCE_CLIENT_ID=
+CONFLUENCE_CLIENT_SECRET=
 ```
 
 ---
@@ -1038,8 +1118,9 @@ GMAIL_SYNC_ENABLED=true
 
 The connector architecture (Workspace → `*Install`) is designed to extend to:
 - Outlook (email connector — Gmail is already implemented)
-- Confluence / Notion (docs)
+- Notion (same `IssueDocContext` → renderer pattern as Confluence)
 - Linear, GitHub Issues
+- Per-issue document upload (PDF/Markdown as authoritative context source for `/doc`)
 - LLM-based summary rewriting (drop-in replacement for `packages/summary-engine`)
-- Role-based permissions
+- Full RBAC + department access enforcement (schema foundation is in place)
 - Atlassian Marketplace listing

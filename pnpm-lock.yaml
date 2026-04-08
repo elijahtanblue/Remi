@@ -63,6 +63,9 @@ importers:
       '@fastify/formbody':
         specifier: ^8.0.1
         version: 8.0.2
+      '@remi/confluence':
+        specifier: workspace:*
+        version: link:../../packages/confluence
       '@remi/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -112,6 +115,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@remi/confluence':
+        specifier: workspace:*
+        version: link:../../packages/confluence
       '@remi/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -155,6 +161,28 @@ importers:
       tsx:
         specifier: ^4.19.0
         version: 4.21.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/confluence:
+    dependencies:
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.9.3))(typescript@5.9.3)
+      '@remi/db':
+        specifier: workspace:*
+        version: link:../db
+      '@remi/shared':
+        specifier: workspace:*
+        version: link:../shared
+      uuid:
+        specifier: ^11.0.0
+        version: 11.1.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

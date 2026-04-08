@@ -1,4 +1,5 @@
 export * from './workspace.repo.js';
+export * from './department.repo.js';
 export * from './issue.repo.js';
 export * from './issue-event.repo.js';
 export * from './slack-thread.repo.js';
@@ -10,3 +11,4 @@ export * from './dead-letter.repo.js';
 export * from './gmail.repo.js';
 export * from './product-event.repo.js';
 export * from './memory.repo.js';
+export * from './confluence.repo.js';

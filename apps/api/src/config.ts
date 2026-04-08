@@ -30,6 +30,9 @@ const schema = z.object({
   ADMIN_API_KEY: z.string().default('dev-admin-key'),
   // App base URL (for Jira Connect descriptor)
   BASE_URL: z.string().default('http://localhost:3000'),
+  // Confluence OAuth
+  CONFLUENCE_CLIENT_ID: z.string().optional(),
+  CONFLUENCE_CLIENT_SECRET: z.string().optional(),
 });
 
 export const config = schema.parse(process.env);

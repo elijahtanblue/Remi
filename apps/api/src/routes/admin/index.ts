@@ -16,7 +16,14 @@ import {
   upsertGmailInstall,
   findGmailInstall,
   getProductEventCounts,
+  createDepartment,
+  findDepartmentsByWorkspace,
+  updateDepartment,
+  deleteDepartment,
+  upsertConfluenceInstall,
+  findConfluenceInstall,
 } from '@remi/db';
+import { exchangeConfluenceCode } from '@remi/confluence';
 import { queue } from '../../queue.js';
 import { config } from '../../config.js';
 import { QueueNames } from '@remi/shared';
@@ -263,5 +270,145 @@ export async function adminRoutes(app: FastifyInstance) {
     }));
 
     return { logs: enriched };
+  });
+
+  // ─── Confluence ───────────────────────────────────────────────────────────
+
+  // GET /admin/confluence/oauth-url
+  // Returns the Atlassian OAuth 2.0 authorisation URL for a workspace to connect Confluence.
+  app.get('/confluence/oauth-url', async (request, reply) => {
+    if (!config.CONFLUENCE_CLIENT_ID) {
+      return reply.code(503).send({ error: 'Confluence OAuth not configured (CONFLUENCE_CLIENT_ID missing)' });
+    }
+    const { workspaceId } = request.query as { workspaceId: string };
+    if (!workspaceId) return reply.code(400).send({ error: 'workspaceId is required' });
+
+    const redirectUri = `${config.BASE_URL}/admin/confluence/callback`;
+    const scopes = [
+      'read:confluence-space.summary',
+      'write:confluence-content',
+      'offline_access',
+    ].join(' ');
+
+    const url = new URL('https://auth.atlassian.com/authorize');
+    url.searchParams.set('audience', 'api.atlassian.com');
+    url.searchParams.set('client_id', config.CONFLUENCE_CLIENT_ID);
+    url.searchParams.set('scope', scopes);
+    url.searchParams.set('redirect_uri', redirectUri);
+    url.searchParams.set('state', workspaceId);
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('prompt', 'consent');
+
+    return { url: url.toString() };
+  });
+
+  // GET /admin/confluence/callback
+  // OAuth callback — exchanges the code for tokens and saves the install.
+  app.get('/confluence/callback', async (request, reply) => {
+    const { code, state: workspaceId, error } = request.query as {
+      code?: string;
+      state?: string;
+      error?: string;
+    };
+
+    if (error || !code || !workspaceId) {
+      return reply.code(400).send({ error: error ?? 'Missing code or state' });
+    }
+    if (!config.CONFLUENCE_CLIENT_ID || !config.CONFLUENCE_CLIENT_SECRET) {
+      return reply.code(503).send({ error: 'Confluence OAuth not configured' });
+    }
+
+    const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+    if (!workspace) return reply.code(404).send({ error: `Workspace ${workspaceId} not found` });
+
+    const tokens = await exchangeConfluenceCode({
+      code,
+      clientId: config.CONFLUENCE_CLIENT_ID,
+      clientSecret: config.CONFLUENCE_CLIENT_SECRET,
+      redirectUri: `${config.BASE_URL}/admin/confluence/callback`,
+    });
+
+    const install = await upsertConfluenceInstall(prisma, {
+      workspaceId,
+      cloudId: tokens.cloudId,
+      siteUrl: tokens.siteUrl,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      scopes: tokens.scopes,
+    });
+
+    // Strip tokens from response for safety
+    const { accessToken: _at, refreshToken: _rt, ...safeInstall } = install;
+    return reply.code(200).send({ ok: true, install: safeInstall });
+  });
+
+  // GET /admin/confluence/:workspaceId
+  app.get('/confluence/:workspaceId', async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const install = await findConfluenceInstall(prisma, workspaceId);
+    if (!install) return reply.code(404).send({ error: 'Confluence not configured for this workspace' });
+    const { accessToken: _at, refreshToken: _rt, ...safeInstall } = install;
+    return { install: safeInstall };
+  });
+
+  // ─── Departments ──────────────────────────────────────────────────────────
+
+  // GET /admin/workspaces/:workspaceId/departments
+  app.get('/workspaces/:workspaceId/departments', async (request) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const departments = await findDepartmentsByWorkspace(prisma, workspaceId);
+    return { departments };
+  });
+
+  // POST /admin/workspaces/:workspaceId/departments
+  // Body: { name, jiraProjectPrefixes, slackChannelPatterns }
+  app.post('/workspaces/:workspaceId/departments', async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const body = request.body as {
+      name: string;
+      jiraProjectPrefixes?: string[];
+      slackChannelPatterns?: string[];
+    };
+
+    if (!body.name?.trim()) {
+      return reply.code(400).send({ error: 'name is required' });
+    }
+
+    const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+    if (!workspace) return reply.code(404).send({ error: `Workspace ${workspaceId} not found` });
+
+    const department = await createDepartment(
+      prisma,
+      workspaceId,
+      body.name.trim(),
+      body.jiraProjectPrefixes ?? [],
+      body.slackChannelPatterns ?? [],
+    );
+    return reply.code(201).send({ department });
+  });
+
+  // PUT /admin/departments/:id
+  // Body: { name?, jiraProjectPrefixes?, slackChannelPatterns? }
+  app.put('/departments/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as {
+      name?: string;
+      jiraProjectPrefixes?: string[];
+      slackChannelPatterns?: string[];
+    };
+
+    const department = await updateDepartment(prisma, id, {
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.jiraProjectPrefixes !== undefined ? { jiraProjectPrefixes: body.jiraProjectPrefixes } : {}),
+      ...(body.slackChannelPatterns !== undefined ? { slackChannelPatterns: body.slackChannelPatterns } : {}),
+    });
+    return { department };
+  });
+
+  // DELETE /admin/departments/:id
+  app.delete('/departments/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await deleteDepartment(prisma, id);
+    return reply.code(204).send();
   });
 }
