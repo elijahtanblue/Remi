@@ -151,6 +151,9 @@ jobs:
             export GHCR_IMAGE_PREFIX="ghcr.io/${{ github.repository_owner }}"
             export IMAGE_TAG="${{ github.sha }}"
 
+            # Remove unused images to free disk space before pulling new ones
+            docker image prune -af
+
             # Pull images pinned to this exact commit SHA
             compose -f docker-compose.prod.yml pull
 
