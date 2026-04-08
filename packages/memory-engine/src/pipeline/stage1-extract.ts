@@ -104,7 +104,9 @@ Return only valid JSON. No markdown. No explanation.`;
 }
 
 export function parseExtractionResponse(raw: string): ExtractionResult {
-  const parsed = JSON.parse(raw) as { observations?: unknown[] };
+  // Strip markdown code fences if the model wraps output despite JSON mode
+  const stripped = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const parsed = JSON.parse(stripped) as { observations?: unknown[] };
   if (!Array.isArray(parsed.observations)) {
     return { observations: [] };
   }

@@ -647,9 +647,10 @@ This feature requires a **Google Workspace** domain (not personal Gmail accounts
 
 > **Google Cloud Console → APIs & Services → Credentials**
 
-1. Click **+ Create Credentials** → **application data**
+1. Click **+ Create Credentials** → **Service account**
+   - In the current Google Cloud UI, there is no **application data** option here. **Service account** is the correct choice.
 2. Service account name: `remi-gmail-reader`
-3. Click **Create and Continue** → skip the optional role/access steps → click **Done**
+3. Click **Create and Continue** → leave the optional role and user access steps blank → click **Done**
 4. Click the service account you just created in the list
 5. Go to the **Keys** tab → **Add Key** → **Create new key** → choose **JSON** → click **Create**
    - A JSON file downloads automatically — **keep this safe**, you'll paste its contents into the configure API call below
@@ -661,10 +662,10 @@ This feature requires a **Google Workspace** domain (not personal Gmail accounts
 Still on the service account detail page:
 
 1. Click the **Details** tab
-2. Under **Advanced settings**, find **Domain-wide delegation** and click **Edit** (or **Show domain-wide delegation**)
-3. Go to Step D for now
-4. Click **Save**
-5. Note the **Client ID** shown (a long number) — you need it in the next step
+2. Under **Advanced settings**, enable **Google Workspace Domain-wide Delegation** (Google may also show this as **Show domain-wide delegation** or **Edit**)
+3. Click **Save**
+4. Note the **Client ID** shown (a long number) — you need it in the next step
+   - If you don't see it on this screen, you can also find it in the downloaded JSON key file or under **IAM & Admin → Service Accounts → remi-gmail-reader → Advanced settings**
 
 ---
 
@@ -688,11 +689,20 @@ This grants Remi read-only access to impersonate the email addresses you configu
 
 #### E. Configure Remi via the admin API
 
-> **Your computer's terminal**
+> **Any terminal that can reach your running Remi API**
+
+This is **not** a deploy step. It is a one-time authenticated API request that tells your already-running Remi instance which Gmail service account, domain, and mailbox list to store in the database for this workspace.
+At the moment, the repo exposes this setup through the admin API rather than a dedicated Gmail setup form in the admin UI.
+
+- In most setups, run this from **your own computer's terminal** because the JSON key file from Step B was downloaded there.
+- If your API is only reachable from inside your server or private network, SSH into the server and call `http://localhost:3000/admin/gmail/configure` instead of the public `https://...` URL.
+- The examples below use **bash-style** quoting, so on Windows the easiest option is **WSL** or **Git Bash**.
 
 Replace the placeholder values:
 - `YOUR_ADMIN_API_KEY` — from your `ADMIN_API_KEY` env var
 - `YOUR_WORKSPACE_ID` — the workspace ID from the admin dashboard Workspaces page
+  - If you get `Workspace ... not found`, fetch the live list from the same environment with:
+    `curl https://api.memoremi.com/admin/workspaces -H "x-admin-key: YOUR_ADMIN_API_KEY"`
 - The service account JSON — paste the full contents of the JSON file downloaded in Step B (minified to one line, or use `$(cat service-account.json)`)
 
 ```bash
@@ -722,6 +732,24 @@ curl -X POST https://api.memoremi.com/admin/gmail/configure \
     \"domain\": \"yourcompany.com\",
     \"monitoredEmails\": [\"support@yourcompany.com\", \"ops@yourcompany.com\"]
   }"
+```
+
+On Windows PowerShell, prefer `Invoke-RestMethod` instead of `curl.exe` to avoid JSON escaping issues:
+
+```powershell
+$body = @{
+  workspaceId = "YOUR_WORKSPACE_ID"
+  serviceAccountJson = [IO.File]::ReadAllText("D:\path\to\service-account.json")
+  domain = "yourcompany.com"
+  monitoredEmails = @("support@yourcompany.com", "ops@yourcompany.com")
+} | ConvertTo-Json -Compress
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://api.memoremi.com/admin/gmail/configure" `
+  -Headers @{ "x-admin-key" = "YOUR_ADMIN_API_KEY" } `
+  -ContentType "application/json" `
+  -Body $body
 ```
 
 A successful response looks like:

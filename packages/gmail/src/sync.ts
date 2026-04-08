@@ -129,7 +129,12 @@ async function syncMailboxIncremental(
     try {
       await processMessage(gmailInstallId, workspaceId, domain, gmail, msgId, queue);
     } catch (err) {
-      console.error(`[gmail-sync] Failed to process message ${msgId}:`, err);
+      const status = (err as { status?: number; code?: number }).status ?? (err as { status?: number; code?: number }).code;
+      if (status === 404) {
+        console.warn(`[gmail-sync] Skipping message ${msgId}: not found (spam/trash/deleted)`);
+      } else {
+        console.error(`[gmail-sync] Failed to process message ${msgId}:`, err);
+      }
     }
   }
 
@@ -160,7 +165,12 @@ async function syncMailboxFull(
       try {
         await processMessage(gmailInstallId, workspaceId, domain, gmail, msgRef.id, queue);
       } catch (err) {
-        console.error(`[gmail-sync] Failed to process message ${msgRef.id}:`, err);
+        const status = (err as { status?: number; code?: number }).status ?? (err as { status?: number; code?: number }).code;
+        if (status === 404) {
+          console.warn(`[gmail-sync] Skipping message ${msgRef.id}: not found (spam/trash/deleted)`);
+        } else {
+          console.error(`[gmail-sync] Failed to process message ${msgRef.id}:`, err);
+        }
       }
     }
 
