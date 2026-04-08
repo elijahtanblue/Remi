@@ -7,6 +7,17 @@ export async function createIssueThreadLink(
   return prisma.issueThreadLink.create({ data });
 }
 
+export async function upsertIssueThreadLink(
+  prisma: PrismaClient,
+  data: { issueId: string; threadId: string },
+) {
+  return prisma.issueThreadLink.upsert({
+    where: { issueId_threadId: { issueId: data.issueId, threadId: data.threadId } },
+    create: { issueId: data.issueId, threadId: data.threadId },
+    update: { unlinkedAt: null }, // Reactivate if previously unlinked
+  });
+}
+
 export async function findIssueThreadLink(
   prisma: PrismaClient,
   issueId: string,

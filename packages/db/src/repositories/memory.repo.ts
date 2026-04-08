@@ -9,11 +9,22 @@ export async function getMemoryConfig(prisma: PrismaClient, workspaceId: string)
 export async function upsertMemoryConfig(
   prisma: PrismaClient,
   workspaceId: string,
-  data: { enabled?: boolean; excludedChannelIds?: string[]; excludedUserIds?: string[] },
+  data: {
+    enabled?: boolean;
+    excludedChannelIds?: string[];
+    excludedUserIds?: string[];
+    trackedChannelIds?: string[];
+  },
 ) {
   return prisma.workspaceMemoryConfig.upsert({
     where: { workspaceId },
-    create: { workspaceId, enabled: data.enabled ?? false, excludedChannelIds: data.excludedChannelIds ?? [], excludedUserIds: data.excludedUserIds ?? [] },
+    create: {
+      workspaceId,
+      enabled: data.enabled ?? false,
+      excludedChannelIds: data.excludedChannelIds ?? [],
+      excludedUserIds: data.excludedUserIds ?? [],
+      trackedChannelIds: data.trackedChannelIds ?? [],
+    },
     update: data,
   });
 }
