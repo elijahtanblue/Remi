@@ -20,6 +20,7 @@ export const QueueNames = {
   MEMORY_SNAPSHOT: "memory-snapshot",
   MEMORY_WRITEBACK_PROPOSE: "memory-writeback-propose",
   MEMORY_WRITEBACK_APPLY: "memory-writeback-apply",
+  DOC_GENERATE_JOBS: "doc-generate-jobs",
 } as const;
 
 export type QueueName = (typeof QueueNames)[keyof typeof QueueNames];
@@ -47,6 +48,7 @@ export const TriggerReason = {
   MANUAL_REQUEST: "manual_request",
   SCHEDULED: "scheduled",
   BACKFILL_COMPLETE: "backfill_complete",
+  JIRA_CREATED: "jira_created",
 } as const;
 
 export type TriggerReasonValue =

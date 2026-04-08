@@ -124,7 +124,46 @@ export async function handleJiraEvent(
     occurredAt: new Date(message.timestamp),
   });
 
-  // 7. Check for active links and enqueue summary job if this event is meaningful
+  // 7a. For new issues: store description as a queryable event and generate an
+  //     initial summary so the Jira panel is populated without admin intervention.
+  if (payload.kind === 'issue_created') {
+    const rawDescription = fields?.description;
+    if (rawDescription != null) {
+      const descriptionText =
+        typeof rawDescription === 'string'
+          ? rawDescription
+          : JSON.stringify(rawDescription);
+      const descKey = `jira:created-desc:${payload.issueId}`;
+      const existing = await prisma.issueEvent.findUnique({ where: { idempotencyKey: descKey } });
+      if (!existing) {
+        await createIssueEvent(prisma, {
+          issueId: issue.id,
+          idempotencyKey: descKey,
+          eventType: 'jira_description_sync',
+          source: 'jira_webhook',
+          changedFields: { text: descriptionText },
+          rawPayload: { description: rawDescription } as Record<string, unknown>,
+          occurredAt: new Date(message.timestamp),
+        });
+      }
+    }
+
+    // Always enqueue an initial summary for the Jira panel regardless of linked threads.
+    await queue.send(QueueNames.SUMMARY_JOBS, {
+      id: uuidv4(),
+      idempotencyKey: `summary:jira:${issue.id}:${message.idempotencyKey}`,
+      workspaceId: workspace.id,
+      timestamp: new Date().toISOString(),
+      type: 'summary_job',
+      payload: {
+        issueId: issue.id,
+        triggerReason: TriggerReason.JIRA_CREATED,
+      },
+    });
+    console.log(`[jira-events] Enqueued initial summary for new issue ${issue.id}`);
+  }
+
+  // 7b. Check for active links and enqueue summary job if this event is meaningful
   const links = await findLinksByIssueId(prisma, issue.id);
   const activeLinks = links.filter((l) => !l.unlinkedAt);
 
