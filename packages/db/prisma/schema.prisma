@@ -17,10 +17,13 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  slackInstalls SlackWorkspaceInstall[]
-  jiraInstalls  JiraWorkspaceInstall[]
-  gmailInstalls GmailWorkspaceInstall[]
-  users         User[]
+  slackInstalls      SlackWorkspaceInstall[]
+  jiraInstalls       JiraWorkspaceInstall[]
+  gmailInstalls      GmailWorkspaceInstall[]
+  confluenceInstall  ConfluenceWorkspaceInstall?
+  confluencePages    ConfluencePage[]
+  users              User[]
+  departments        Department[]
   issues        Issue[]
   slackThreads  SlackThread[]
   emailThreads  EmailThread[]
@@ -32,6 +35,25 @@ model Workspace {
   memoryUnits   MemoryUnit[]
 
   @@map("workspaces")
+}
+
+// ─── Departments ─────────────────────────────────────────────────────────────
+
+model Department {
+  id                   String   @id @default(cuid())
+  workspaceId          String
+  name                 String
+  jiraProjectPrefixes  String[]
+  slackChannelPatterns String[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+  issues      Issue[]
+  memoryUnits MemoryUnit[]
+
+  @@index([workspaceId])
+  @@map("departments")
 }
 
 // ─── Integration Installs ────────────────────────────────────────────────────
@@ -151,7 +173,10 @@ model Issue {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
+  departmentId           String?
+
   workspace   Workspace         @relation(fields: [workspaceId], references: [id])
+  department  Department?       @relation(fields: [departmentId], references: [id])
   events      IssueEvent[]
   threadLinks IssueThreadLink[]
   emailLinks  IssueEmailLink[]
@@ -343,6 +368,46 @@ model QueueDeadLetter {
   @@map("queue_dead_letters")
 }
 
+// ─── Confluence Integration ───────────────────────────────────────────────────
+
+model ConfluenceWorkspaceInstall {
+  id           String    @id @default(cuid())
+  workspaceId  String    @unique
+  cloudId      String
+  siteUrl      String
+  accessToken  String
+  refreshToken String
+  scopes       String[]
+  installedAt  DateTime  @default(now())
+  uninstalledAt DateTime?
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id])
+  pages     ConfluencePage[]
+
+  @@map("confluence_workspace_installs")
+}
+
+model ConfluencePage {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  installId    String
+  issueId      String?
+  departmentId String?
+  confluencePageId String
+  spaceKey     String?
+  title        String
+  pageUrl      String
+  docType      String   // 'handoff' | 'summary' | 'escalation'
+  createdAt    DateTime @default(now())
+
+  workspace Workspace                  @relation(fields: [workspaceId], references: [id])
+  install   ConfluenceWorkspaceInstall @relation(fields: [installId], references: [id])
+
+  @@index([workspaceId])
+  @@index([issueId])
+  @@map("confluence_pages")
+}
+
 // ─── Gmail Integration ────────────────────────────────────────────────────────
 
 model GmailWorkspaceInstall {
@@ -426,6 +491,7 @@ model WorkspaceMemoryConfig {
   enabled            Boolean  @default(false)
   excludedChannelIds String[]
   excludedUserIds    String[]
+  trackedChannelIds  String[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -443,8 +509,11 @@ model MemoryUnit {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  departmentId String?
+
   workspace    Workspace                @relation(fields: [workspaceId], references: [id])
   issue        Issue?                   @relation(fields: [issueId], references: [id])
+  department   Department?              @relation(fields: [departmentId], references: [id])
   observations MemoryObservation[]
   snapshots    MemorySnapshot[]
   proposals    MemoryWritebackProposal[]
