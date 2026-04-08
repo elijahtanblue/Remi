@@ -27,11 +27,19 @@ export async function memoryRoutes(app: FastifyInstance, { queue }: { queue: IQu
   // GET /admin/memory/config/:workspaceId
   app.get<{ Params: { workspaceId: string } }>('/config/:workspaceId', async (req, reply) => {
     const config = await getMemoryConfig(prisma, req.params.workspaceId);
-    return reply.send(config ?? { enabled: false, excludedChannelIds: [], excludedUserIds: [] });
+    return reply.send(config ?? { enabled: false, excludedChannelIds: [], excludedUserIds: [], trackedChannelIds: [] });
   });
 
   // PUT /admin/memory/config/:workspaceId
-  app.put<{ Params: { workspaceId: string }; Body: { enabled?: boolean; excludedChannelIds?: string[]; excludedUserIds?: string[] } }>(
+  app.put<{
+    Params: { workspaceId: string };
+    Body: {
+      enabled?: boolean;
+      excludedChannelIds?: string[];
+      excludedUserIds?: string[];
+      trackedChannelIds?: string[];
+    };
+  }>(
     '/config/:workspaceId', async (req, reply) => {
       const config = await upsertMemoryConfig(prisma, req.params.workspaceId, req.body);
       return reply.send(config);
