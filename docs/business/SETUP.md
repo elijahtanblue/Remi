@@ -821,12 +821,13 @@ Remi can write operational briefs directly to Confluence pages via `/doc ISSUE-K
 3. Under **Permissions**, add **Confluence API** → enable these scopes:
    - `read:confluence-space.summary`
    - `write:confluence-content`
-   - `offline_access`
 4. Under **Authorization**, set the Callback URL to:
    ```
    https://api.memoremi.com/admin/confluence/callback
    ```
 5. Note the **Client ID** and **Client Secret** from the app settings page
+
+`offline_access` is not shown in Atlassian's Confluence permissions picker. That is expected. Remi requests `offline_access` automatically in the OAuth authorization URL returned by `/admin/confluence/oauth-url`, so you do not need to add it manually in the developer console.
 
 #### B. Add credentials to your server
 
@@ -855,6 +856,19 @@ docker compose -f docker-compose.prod.yml up -d
    ```
 2. Open the returned URL in a browser — authorise Remi to access your Confluence site
 3. After authorising, you'll be redirected back and the install is saved automatically
+
+If Atlassian shows `Access denied` and says the app requires access to a Confluence site, the Atlassian account you used for authorisation does not currently have access to any Confluence site for that organisation. Common causes:
+- you are signed into the wrong Atlassian account in the browser
+- the site has Jira but not Confluence enabled
+- your account exists in the org but does not have a Confluence product seat / permission yet
+
+Before retrying, confirm you can open your Confluence site directly in the same browser session, for example:
+
+```text
+https://YOUR-SITE.atlassian.net/wiki
+```
+
+If that page does not load for your account, fix Confluence access first, then rerun Step 15C.
 
 #### D. Verify the setup
 

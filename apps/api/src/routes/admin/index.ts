@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import {
   prisma,
   listWorkspaces,
@@ -33,11 +34,42 @@ import { memoryRoutes } from './memory.js';
 import { parseDeadLetterDeleteQuery, parseDeadLetterListQuery } from './dead-letter-query.js';
 import { serializeAdminSummary, serializeAdminSummaries, type SummaryWithIssueRecord } from './summary-response.js';
 
+function createConfluenceOauthState(workspaceId: string): string {
+  const payload = Buffer.from(JSON.stringify({ workspaceId }), 'utf8').toString('base64url');
+  const sig = createHmac('sha256', config.ADMIN_API_KEY).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+function parseConfluenceOauthState(state: string): string | null {
+  const parts = state.split('.');
+  if (parts.length !== 2) return null;
+
+  const [payload, sig] = parts;
+  const expectedSig = createHmac('sha256', config.ADMIN_API_KEY).update(payload).digest();
+  const providedSig = Buffer.from(sig, 'base64url');
+
+  if (providedSig.length !== expectedSig.length || !timingSafeEqual(providedSig, expectedSig)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { workspaceId?: unknown };
+    return typeof parsed.workspaceId === 'string' && parsed.workspaceId ? parsed.workspaceId : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   await app.register(memoryRoutes, { prefix: '/memory', queue });
 
   // Auth hook — all /admin/* routes require the X-Admin-Key header
   app.addHook('onRequest', async (request, reply) => {
+    const path = request.raw.url?.split('?')[0] ?? '';
+    if (path === '/admin/confluence/callback') {
+      return;
+    }
+
     const key = request.headers['x-admin-key'];
     if (key !== config.ADMIN_API_KEY) {
       return reply.code(401).send({ error: 'Unauthorized' });
@@ -295,7 +327,7 @@ export async function adminRoutes(app: FastifyInstance) {
     url.searchParams.set('client_id', config.CONFLUENCE_CLIENT_ID);
     url.searchParams.set('scope', scopes);
     url.searchParams.set('redirect_uri', redirectUri);
-    url.searchParams.set('state', workspaceId);
+    url.searchParams.set('state', createConfluenceOauthState(workspaceId));
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('prompt', 'consent');
 
@@ -305,17 +337,22 @@ export async function adminRoutes(app: FastifyInstance) {
   // GET /admin/confluence/callback
   // OAuth callback — exchanges the code for tokens and saves the install.
   app.get('/confluence/callback', async (request, reply) => {
-    const { code, state: workspaceId, error } = request.query as {
+    const { code, state, error } = request.query as {
       code?: string;
       state?: string;
       error?: string;
     };
 
-    if (error || !code || !workspaceId) {
+    if (error || !code || !state) {
       return reply.code(400).send({ error: error ?? 'Missing code or state' });
     }
     if (!config.CONFLUENCE_CLIENT_ID || !config.CONFLUENCE_CLIENT_SECRET) {
       return reply.code(503).send({ error: 'Confluence OAuth not configured' });
+    }
+
+    const workspaceId = parseConfluenceOauthState(state);
+    if (!workspaceId) {
+      return reply.code(400).send({ error: 'Invalid OAuth state' });
     }
 
     const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
