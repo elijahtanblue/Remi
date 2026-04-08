@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   findOrCreateMemoryUnit,
   getMemoryConfig,
+  upsertMemoryConfig,
   getLatestSnapshot,
   createObservations,
   listObservationsSince,
@@ -94,5 +95,43 @@ describe('updateProposalStatus', () => {
     expect(call.data.status).toBe('approved');
     expect(call.data.approvedBy).toBe('user1');
     expect(call.data.approvedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('upsertMemoryConfig', () => {
+  it('creates config with trackedChannelIds when none exists', async () => {
+    const config = {
+      id: 'cfg1',
+      workspaceId: 'ws1',
+      enabled: false,
+      excludedChannelIds: [],
+      excludedUserIds: [],
+      trackedChannelIds: ['C123'],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    mockPrisma.workspaceMemoryConfig.upsert.mockResolvedValue(config);
+    const result = await upsertMemoryConfig(mockPrisma, 'ws1', { trackedChannelIds: ['C123'] });
+    expect(result.trackedChannelIds).toEqual(['C123']);
+    expect(mockPrisma.workspaceMemoryConfig.upsert).toHaveBeenCalledWith({
+      where: { workspaceId: 'ws1' },
+      create: expect.objectContaining({ trackedChannelIds: ['C123'], workspaceId: 'ws1' }),
+      update: { trackedChannelIds: ['C123'] },
+    });
+  });
+
+  it('defaults trackedChannelIds to [] when not provided', async () => {
+    const config = {
+      id: 'cfg2', workspaceId: 'ws1', enabled: true,
+      excludedChannelIds: [], excludedUserIds: [], trackedChannelIds: [],
+      createdAt: new Date(), updatedAt: new Date(),
+    };
+    mockPrisma.workspaceMemoryConfig.upsert.mockResolvedValue(config);
+    await upsertMemoryConfig(mockPrisma, 'ws1', { enabled: true });
+    expect(mockPrisma.workspaceMemoryConfig.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ trackedChannelIds: [] }),
+      }),
+    );
   });
 });
