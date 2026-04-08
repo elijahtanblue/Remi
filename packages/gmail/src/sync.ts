@@ -208,7 +208,7 @@ async function processMessage(
   const dateHeader = getHeader('Date');
   // Prefer full plain-text body; fall back to Gmail's auto-generated snippet
   const fullBody = extractPlainTextBody(msg.payload ?? undefined);
-  const snippet = fullBody || msg.snippet ?? '';
+  const snippet = fullBody || (msg.snippet ?? '');
   const gmailThreadId = msg.threadId ?? messageId;
 
   const participants = parseParticipants(from, to, cc);
