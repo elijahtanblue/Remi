@@ -20,6 +20,8 @@ const schema = z.object({
   MAX_RETRY_COUNT: z.coerce.number().default(3),
   GMAIL_SYNC_ENABLED: z.coerce.boolean().default(true),
   SLACK_BACKFILL_LIMIT: z.coerce.number().default(500),
+  CONFLUENCE_CLIENT_ID: z.string().optional(),
+  CONFLUENCE_CLIENT_SECRET: z.string().optional(),
 });
 
 export const config = schema.parse(process.env);

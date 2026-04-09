@@ -378,8 +378,10 @@ model ConfluenceWorkspaceInstall {
   accessToken  String
   refreshToken String
   scopes       String[]
-  installedAt  DateTime  @default(now())
-  uninstalledAt DateTime?
+  installedAt     DateTime  @default(now())
+  uninstalledAt   DateTime?
+  tokenExpiresAt  DateTime?
+  defaultSpaceKey String?
 
   workspace Workspace       @relation(fields: [workspaceId], references: [id])
   pages     ConfluencePage[]
@@ -397,8 +399,10 @@ model ConfluencePage {
   spaceKey     String?
   title        String
   pageUrl      String
-  docType      String   // 'handoff' | 'summary' | 'escalation'
-  createdAt    DateTime @default(now())
+  docType           String   // 'handoff' | 'summary' | 'escalation'
+  confluenceVersion Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   workspace Workspace                  @relation(fields: [workspaceId], references: [id])
   install   ConfluenceWorkspaceInstall @relation(fields: [installId], references: [id])
@@ -535,6 +539,8 @@ model MemoryObservation {
   modelId       String
   promptVersion String
   extractedAt   DateTime @default(now())
+  state         String   @default("active")  // 'active' | 'superseded'
+  supersededAt  DateTime?
 
   memoryUnit MemoryUnit @relation(fields: [memoryUnitId], references: [id])
 

@@ -106,9 +106,13 @@ export interface DocGenerateJobMessage extends BaseQueueMessage {
     issueId: string;
     issueKey: string;
     docType: 'handoff' | 'summary' | 'escalation';
-    /** Slack channel + ts so we can reply with the generated URL */
-    replyChannelId: string;
+    /** Set for manual /doc commands — channel to post the reply into */
+    replyChannelId?: string;
     replyThreadTs?: string;
+    /** Set for auto-triggered docs — most recently active linked Slack channel */
+    triggerChannelId?: string | null;
+    /** True when generated automatically by a Jira status change, not a /doc command */
+    autoTriggered?: boolean;
   };
 }
 
