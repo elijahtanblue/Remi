@@ -174,6 +174,55 @@ export function parseSnapshotResponse(raw: string): SnapshotResult {
   };
 }
 
+const RECONCILED_CATEGORIES = new Set(['blocker', 'decision', 'open_question', 'action_item']);
+
+function normalizeContent(s: string): string {
+  return s.toLowerCase().replace(/\W+/g, ' ').trim();
+}
+
+/**
+ * After a new snapshot is produced, mark active observations as 'superseded'
+ * if their content no longer appears in the snapshot output.
+ *
+ * Stage 2 explicitly drops items it considers resolved or no longer relevant.
+ * This function writes that decision back to the observations table so that
+ * the doc renderer can show them as strikethrough.
+ *
+ * Note: uses substring matching after normalisation. Reworded-but-equivalent
+ * items may not be detected. This is a known V1 limitation.
+ */
+export async function reconcileObservationStates(
+  prisma: PrismaClient,
+  memoryUnitId: string,
+  snapshot: SnapshotResult,
+): Promise<void> {
+  const activeObs = await prisma.memoryObservation.findMany({
+    where: { memoryUnitId, state: 'active' },
+  });
+
+  const snapshotContents = [
+    ...snapshot.blockers,
+    ...snapshot.keyDecisions,
+    ...snapshot.openQuestions,
+    ...snapshot.openActions.map((a) => a.description),
+  ].map(normalizeContent);
+
+  const toSupersede = activeObs.filter((obs) => {
+    if (!RECONCILED_CATEGORIES.has(obs.category)) return false;
+    const normalized = normalizeContent(obs.content);
+    return !snapshotContents.some(
+      (sc) => sc.includes(normalized) || normalized.includes(sc),
+    );
+  });
+
+  if (toSupersede.length === 0) return;
+
+  await prisma.memoryObservation.updateMany({
+    where: { id: { in: toSupersede.map((o) => o.id) } },
+    data: { state: 'superseded', supersededAt: new Date() },
+  });
+}
+
 export async function runStage2(
   prisma: PrismaClient,
   memoryUnitId: string,
@@ -240,6 +289,12 @@ export async function runStage2(
     modelId: MODELS.STAGE2_SNAPSHOT,
     promptVersion: PROMPT_VERSIONS.STAGE2_SNAPSHOT,
     sourceObsIds,
+  });
+
+  // Reconcile: mark observations dropped by this snapshot as superseded
+  await reconcileObservationStates(prisma, memoryUnitId, result).catch((err) => {
+    console.warn(`[stage2] reconcileObservationStates failed for ${memoryUnitId}:`, err);
+    // Non-fatal — snapshot was created; reconciliation will retry on next run
   });
 
   return { snapshot, isNew: true };

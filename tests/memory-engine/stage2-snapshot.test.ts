@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { vi } from 'vitest';
+import type { PrismaClient } from '@prisma/client';
 import {
   buildSnapshotPrompt,
   mergeDataSources,
   parseSnapshotResponse,
+  reconcileObservationStates,
 } from '../../packages/memory-engine/src/pipeline/stage2-snapshot.js';
 
 describe('buildSnapshotPrompt', () => {
@@ -59,5 +62,66 @@ describe('mergeDataSources', () => {
     expect(
       mergeDataSources(['jira'], ['slack', 'jira', undefined], ['email', 'slack']),
     ).toEqual(['jira', 'slack', 'email']);
+  });
+});
+
+describe('reconcileObservationStates', () => {
+  it('marks observations as superseded when their content is absent from the new snapshot', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const findMany = vi.fn().mockResolvedValue([
+      { id: 'obs-1', category: 'blocker', content: 'OAuth credentials not received', state: 'active' },
+      { id: 'obs-2', category: 'blocker', content: 'Auth service down', state: 'active' },
+    ]);
+    const prisma = { memoryObservation: { findMany, updateMany } } as unknown as PrismaClient;
+
+    const snapshot = {
+      headline: '',
+      currentState: '',
+      keyDecisions: [],
+      openActions: [],
+      // 'Auth service down' is still present; 'OAuth credentials not received' was dropped
+      blockers: ['Auth service down'],
+      openQuestions: [],
+      owners: [],
+      dataSources: [],
+      confidence: 0.8,
+    };
+
+    await reconcileObservationStates(prisma, 'unit-1', snapshot);
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['obs-1'] } },
+      data: { state: 'superseded', supersededAt: expect.any(Date) },
+    });
+  });
+
+  it('does not call updateMany when all active observations are still in the snapshot', async () => {
+    const updateMany = vi.fn();
+    const findMany = vi.fn().mockResolvedValue([
+      { id: 'obs-1', category: 'blocker', content: 'Auth service down', state: 'active' },
+    ]);
+    const prisma = { memoryObservation: { findMany, updateMany } } as unknown as PrismaClient;
+
+    await reconcileObservationStates(prisma, 'unit-1', {
+      headline: '', currentState: '', keyDecisions: [], openActions: [],
+      blockers: ['Auth service down'], openQuestions: [], owners: [], dataSources: [], confidence: 0.9,
+    });
+
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not supersede observations in non-tracked categories (e.g. status_update)', async () => {
+    const updateMany = vi.fn();
+    const findMany = vi.fn().mockResolvedValue([
+      { id: 'obs-1', category: 'status_update', content: 'Moved to in progress', state: 'active' },
+    ]);
+    const prisma = { memoryObservation: { findMany, updateMany } } as unknown as PrismaClient;
+
+    await reconcileObservationStates(prisma, 'unit-1', {
+      headline: '', currentState: '', keyDecisions: [], openActions: [],
+      blockers: [], openQuestions: [], owners: [], dataSources: [], confidence: 0.8,
+    });
+
+    expect(updateMany).not.toHaveBeenCalled();
   });
 });
