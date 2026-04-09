@@ -89,6 +89,7 @@ describe('reconcileObservationStates', () => {
 
     await reconcileObservationStates(prisma, 'unit-1', snapshot);
 
+    expect(findMany).toHaveBeenCalledWith({ where: { memoryUnitId: 'unit-1', state: 'active' } });
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['obs-1'] } },
       data: { state: 'superseded', supersededAt: expect.any(Date) },
@@ -107,6 +108,7 @@ describe('reconcileObservationStates', () => {
       blockers: ['Auth service down'], openQuestions: [], owners: [], dataSources: [], confidence: 0.9,
     });
 
+    expect(findMany).toHaveBeenCalledWith({ where: { memoryUnitId: 'unit-1', state: 'active' } });
     expect(updateMany).not.toHaveBeenCalled();
   });
 
@@ -122,6 +124,25 @@ describe('reconcileObservationStates', () => {
       blockers: [], openQuestions: [], owners: [], dataSources: [], confidence: 0.8,
     });
 
+    expect(findMany).toHaveBeenCalledWith({ where: { memoryUnitId: 'unit-1', state: 'active' } });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('matches action_item observations against openActions descriptions', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const findMany = vi.fn().mockResolvedValue([
+      { id: 'obs-1', category: 'action_item', content: 'Send follow-up email to vendor', state: 'active' },
+    ]);
+    const prisma = { memoryObservation: { findMany, updateMany } } as unknown as PrismaClient;
+
+    // action_item obs content IS in openActions — should NOT be superseded
+    await reconcileObservationStates(prisma, 'unit-1', {
+      headline: '', currentState: '', keyDecisions: [],
+      openActions: [{ description: 'Send follow-up email to vendor', assignee: undefined, dueDate: undefined }],
+      blockers: [], openQuestions: [], owners: [], dataSources: [], confidence: 0.9,
+    });
+
+    expect(findMany).toHaveBeenCalledWith({ where: { memoryUnitId: 'unit-1', state: 'active' } });
     expect(updateMany).not.toHaveBeenCalled();
   });
 });

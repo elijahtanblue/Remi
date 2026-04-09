@@ -211,6 +211,10 @@ export async function reconcileObservationStates(
     if (!RECONCILED_CATEGORIES.has(obs.category)) return false;
     const normalized = normalizeContent(obs.content);
     return !snapshotContents.some(
+      // sc.includes(normalized): obs content is substring of longer snapshot item — still represented
+      // normalized.includes(sc): snapshot item is a shorter rewrite of obs — still represented
+      // Known V1 risk: normalized.includes(sc) may false-negative if obs is a superstring of an
+      // unrelated short snapshot item (e.g. obs 'chase vendor for credentials' kept by sc 'credentials')
       (sc) => sc.includes(normalized) || normalized.includes(sc),
     );
   });
