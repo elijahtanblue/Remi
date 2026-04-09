@@ -156,6 +156,14 @@ Automatically combining context from multiple departments when generating a doc 
 
 **Trigger**: When PMs regularly request that cross-functional launch docs pull from two department contexts, and the manual linking workflow is too cumbersome.
 
+## Confidence Level for Observation Resolution
+
+When an observation (blocker, decision, open question) is marked as superseded and displayed as strikethrough in a Confluence doc, Remi currently uses a binary model: the memory pipeline either supersedes an observation or it does not, based on whether new information contradicts it. A confidence level system would add a scored signal to each supersession — distinguishing between high-confidence resolutions (engineer explicitly confirmed a fix in an email) and low-confidence ones (the issue simply stopped being mentioned). Strikethrough items would carry a confidence indicator, and users could choose a threshold below which items remain active rather than struckthrough.
+
+**Why deferred**: The binary supersession model is sufficient for V1 — the goal is to show meaningful evolution between doc versions, not to provide an auditable confidence score. Adding confidence scoring requires changes to the memory extraction pipeline (LLM must output a confidence value alongside the supersession decision), a new column on observations, and UI treatment in the Confluence renderer. Validate that users actually care about false-positive strikethroughs before building the scoring system.
+
+**Trigger**: When users report that struckthrough items were not actually resolved, or when sales prospects ask how Remi decides when something is fixed.
+
 ## Scanned / Image PDF Extraction
 
 Extracting text from PDFs that are scans or contain image-only pages (no embedded text layer). Requires an OCR pipeline (Tesseract, Google Vision API, or AWS Textract).
