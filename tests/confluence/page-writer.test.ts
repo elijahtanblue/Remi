@@ -15,10 +15,10 @@ const baseContext: IssueDocContext = {
     { date: new Date('2026-04-03T14:00:00Z'), event: 'Priority changed: Medium → High', actor: 'Bob Smith' },
   ],
   keyDecisions: [
-    { content: 'We will use JWT refresh tokens with 15-minute expiry', source: 'slack', citedAt: new Date('2026-04-02T09:00:00Z') },
+    { content: 'We will use JWT refresh tokens with 15-minute expiry', source: 'slack', citedAt: new Date('2026-04-02T09:00:00Z'), superseded: false },
   ],
   blockers: [
-    { content: 'Waiting on security team review of token rotation approach', source: 'slack', citedAt: new Date('2026-04-03T11:00:00Z') },
+    { content: 'Waiting on security team review of token rotation approach', source: 'slack', citedAt: new Date('2026-04-03T11:00:00Z'), superseded: false },
   ],
   openQuestions: [],
   participants: ['Alice Chen', 'Bob Smith', 'Carol Davis'],
@@ -120,6 +120,49 @@ describe('renderConfluencePage', () => {
     const ctx: IssueDocContext = { ...baseContext, docType: 'summary' };
     const { title } = renderConfluencePage(ctx);
     expect(title.toLowerCase()).toContain('summary');
+  });
+
+  it('renders active blockers without strikethrough', () => {
+    const ctx: IssueDocContext = {
+      ...baseContext,
+      blockers: [{ content: 'Active blocker', source: 'slack', citedAt: new Date('2026-04-01'), superseded: false }],
+    };
+    const { body } = renderConfluencePage(ctx);
+    expect(body).toContain('Active blocker');
+    expect(body).not.toContain('<s>');
+  });
+
+  it('renders superseded blockers with strikethrough', () => {
+    const ctx: IssueDocContext = {
+      ...baseContext,
+      blockers: [{ content: 'Fixed blocker', source: 'slack', citedAt: new Date('2026-04-01'), superseded: true, supersededAt: new Date('2026-04-08') }],
+    };
+    const { body } = renderConfluencePage(ctx);
+    expect(body).toContain('<s>');
+    expect(body).toContain('Fixed blocker');
+  });
+
+  it('renders active items before superseded items within a section', () => {
+    const ctx: IssueDocContext = {
+      ...baseContext,
+      blockers: [
+        { content: 'Still blocked', source: 'slack', citedAt: new Date('2026-04-02'), superseded: false },
+        { content: 'Was blocked', source: 'slack', citedAt: new Date('2026-04-01'), superseded: true, supersededAt: new Date('2026-04-08') },
+      ],
+    };
+    const { body } = renderConfluencePage(ctx);
+    const activePos = body.indexOf('Still blocked');
+    const supersededPos = body.indexOf('Was blocked');
+    expect(activePos).toBeLessThan(supersededPos);
+  });
+
+  it('still shows the Blockers section if all items are superseded', () => {
+    const ctx: IssueDocContext = {
+      ...baseContext,
+      blockers: [{ content: 'Old blocker', source: 'slack', citedAt: new Date('2026-04-01'), superseded: true, supersededAt: new Date('2026-04-08') }],
+    };
+    const { body } = renderConfluencePage(ctx);
+    expect(body).toContain('Blockers');
   });
 
   it('includes uploaded context section when provided', () => {

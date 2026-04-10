@@ -22,16 +22,22 @@ export interface IssueDocContext {
     content: string;
     source: string; // 'slack' | 'jira' | 'email'
     citedAt: Date;
+    superseded: boolean;
+    supersededAt?: Date;
   }>;
   blockers: Array<{
     content: string;
     source: string;
     citedAt: Date;
+    superseded: boolean;
+    supersededAt?: Date;
   }>;
   openQuestions: Array<{
     content: string;
     source: string;
     citedAt: Date;
+    superseded: boolean;
+    supersededAt?: Date;
   }>;
   participants: string[];
   linkedThreads: Array<{

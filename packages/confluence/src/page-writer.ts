@@ -59,32 +59,17 @@ export function renderConfluencePage(ctx: IssueDocContext): RenderedPage {
 
   // ── Key Decisions ────────────────────────────────────────────────────────
   if (ctx.keyDecisions.length > 0) {
-    sections.push(section(
-      'Key Decisions',
-      list(ctx.keyDecisions.map(
-        (d) => `${esc(d.content)} <em>(via ${esc(d.source)}, ${fmt(d.citedAt)})</em>`,
-      )),
-    ));
+    sections.push(section('Key Decisions', renderObsList(ctx.keyDecisions)));
   }
 
   // ── Blockers ─────────────────────────────────────────────────────────────
   if (ctx.blockers.length > 0) {
-    sections.push(section(
-      'Blockers',
-      list(ctx.blockers.map(
-        (b) => `${esc(b.content)} <em>(via ${esc(b.source)}, ${fmt(b.citedAt)})</em>`,
-      )),
-    ));
+    sections.push(section('Blockers', renderObsList(ctx.blockers)));
   }
 
   // ── Open Questions ────────────────────────────────────────────────────────
   if (ctx.openQuestions.length > 0) {
-    sections.push(section(
-      'Open Questions',
-      list(ctx.openQuestions.map(
-        (q) => `${esc(q.content)} <em>(via ${esc(q.source)}, ${fmt(q.citedAt)})</em>`,
-      )),
-    ));
+    sections.push(section('Open Questions', renderObsList(ctx.openQuestions)));
   }
 
   // ── Participants ──────────────────────────────────────────────────────────
@@ -128,6 +113,20 @@ export function renderConfluencePage(ctx: IssueDocContext): RenderedPage {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function renderObsList(
+  items: Array<{ content: string; source: string; citedAt: Date; superseded: boolean; supersededAt?: Date }>,
+): string {
+  const active = items.filter((i) => !i.superseded);
+  const superseded = items.filter((i) => i.superseded);
+  const ordered = [...active, ...superseded];
+  return list(
+    ordered.map((item) => {
+      const text = `${esc(item.content)} <em>(via ${esc(item.source)}, ${fmt(item.citedAt)})</em>`;
+      return item.superseded ? `<s>${text}</s>` : text;
+    }),
+  );
+}
 
 function section(heading: string, content: string): string {
   return `<h2>${esc(heading)}</h2>\n${content}`;

@@ -51,32 +51,35 @@ export async function buildIssueDocContext(
   const participants = [...new Set(allMessages.map((m) => m.slackUserId))];
 
   // ── Key decisions, blockers, open questions ───────────────────────────────
-  // If MemoryUnit exists for this issue, prefer its structured observations.
-  // Otherwise fall back to keyword scanning of raw messages.
-  const memoryUnit = await prisma.memoryUnit.findFirst({
+  // Aggregate observations from ALL memory units linked to this issue.
+  const memoryUnits = await prisma.memoryUnit.findMany({
     where: { issueId },
     include: {
       observations: { orderBy: { extractedAt: 'desc' } },
     },
   });
 
-  const keyDecisions = memoryUnit
-    ? memoryUnit.observations
-        .filter((o) => o.category === 'decision')
-        .map((o) => ({ content: o.content, source: o.sourceApp ?? 'slack', citedAt: o.extractedAt }))
-    : [];
+  const allObservations = memoryUnits.flatMap((u) => u.observations);
 
-  const blockers = memoryUnit
-    ? memoryUnit.observations
-        .filter((o) => o.category === 'blocker')
-        .map((o) => ({ content: o.content, source: o.sourceApp ?? 'slack', citedAt: o.extractedAt }))
-    : [];
+  const toObsItem = (o: (typeof allObservations)[number]) => ({
+    content: o.content,
+    source: o.sourceApp ?? 'slack',
+    citedAt: o.extractedAt,
+    superseded: o.state === 'superseded',
+    supersededAt: o.supersededAt ?? undefined,
+  });
 
-  const openQuestions = memoryUnit
-    ? memoryUnit.observations
-        .filter((o) => o.category === 'open_question')
-        .map((o) => ({ content: o.content, source: o.sourceApp ?? 'slack', citedAt: o.extractedAt }))
-    : [];
+  const keyDecisions = allObservations
+    .filter((o) => o.category === 'decision')
+    .map(toObsItem);
+
+  const blockers = allObservations
+    .filter((o) => o.category === 'blocker')
+    .map(toObsItem);
+
+  const openQuestions = allObservations
+    .filter((o) => o.category === 'open_question')
+    .map(toObsItem);
 
   // ── Linked threads summary ────────────────────────────────────────────────
   const linkedThreads = threadLinks.map((l) => ({
