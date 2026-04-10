@@ -254,6 +254,19 @@ postgresql://remi:YOUR_PASSWORD@remi-prod.xxxxxxxxx.ap-southeast-2.rds.amazonaws
 
 > **Your computer's terminal**
 
+First, confirm the AWS CLI is using the deploy user credentials from Step 2 (not an EC2 instance role, CloudShell session, or a read-only profile):
+
+```bash
+aws sts get-caller-identity
+```
+
+The `Arn` should look like:
+```text
+arn:aws:iam::123456789012:user/remi-deploy
+```
+
+If it instead looks like `arn:aws:sts::...:assumed-role/...`, you are using temporary role credentials. Re-run `aws configure` with the Access Key ID and Secret Access Key from Step 2, then check again.
+
 Run these commands to create the 5 queues Remi uses:
 
 ```bash
@@ -269,6 +282,8 @@ Each command prints a URL — **copy all 5 URLs** and save them. They look like:
 ```
 https://sqs.ap-southeast-2.amazonaws.com/123456789012/remi-slack-events.fifo
 ```
+
+If you get `AccessDenied` with `not authorized to perform: sqs:CreateQueue`, the CLI is authenticated as a principal that cannot create queues. The most common cause is running the command on an EC2 instance with a read-only IAM role attached. Run Step 5 from your own computer after `aws configure`, or attach a policy that allows `sqs:CreateQueue` to the role you are using.
 
 ---
 

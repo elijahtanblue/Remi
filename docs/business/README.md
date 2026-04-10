@@ -20,7 +20,8 @@ Remi is your team's operational memory. It links Slack threads to Jira issues, t
 5. Any new messages in the thread or changes to the Jira issue automatically regenerate the summary
 6. Summaries surface in `/brief` in Slack, the Slack App Home, and a panel in the Jira issue sidebar
 7. Summaries are deterministic — no LLM, no API cost, fully auditable
-8. **Gmail (optional):** Remi monitors configured Google Workspace mailboxes and sends a Slack DM when an email references a Jira issue key, making it easy to link email threads to issues
+8. **Confluence (optional):** users can run `/doc PROJ-123 handoff` to generate a draft Confluence page from the linked issue context and get the page URL back in Slack
+9. **Gmail (optional):** Remi monitors configured Google Workspace mailboxes and sends a Slack DM when an email references a Jira issue key, making it easy to link email threads to issues
 
 ---
 
@@ -64,8 +65,9 @@ Both integrations are now live. Head to any Slack thread and run `/link-ticket P
 | `/link-ticket ISSUE-KEY` | Links the current Slack thread to a Jira issue (e.g. `/link-ticket PROJ-123`) |
 | `/brief ISSUE-KEY` | Posts the current summary for that issue in Slack |
 | `/brief ISSUE-KEY --refresh` | Forces a summary regeneration before posting |
+| `/doc ISSUE-KEY [handoff\|summary\|escalation]` | Creates a draft Confluence page for a linked issue and posts the page URL back in Slack |
 
-Run these commands **inside the Slack thread** you want to link — not in a DM or unrelated channel.
+Run `/link-ticket` inside the Slack thread you want to link. `/brief` can be run anywhere, and `/doc` works best in the linked thread so Remi can post the page link back into the same conversation.
 
 ---
 
@@ -90,6 +92,20 @@ Run these commands **inside the Slack thread** you want to link — not in a DM 
 **In Slack App Home:**
 - Click on the Remi app in your Slack sidebar → App Home tab
 - See an overview of all linked issues and their latest summaries
+
+---
+
+### Step-by-step: creating a Confluence doc
+
+1. Link the issue first with `/link-ticket PROJ-123` in the relevant Slack thread
+2. Once the issue is linked, run one of these commands in Slack:
+   - `/doc PROJ-123 handoff`
+   - `/doc PROJ-123 summary`
+   - `/doc PROJ-123 escalation`
+3. Remi immediately acknowledges the request, generates the page asynchronously, and creates a draft page in Confluence
+4. When the page is ready, Remi posts the Confluence URL back to the same Slack channel (and thread, if you ran the command in-thread)
+
+If Confluence is not connected for your workspace yet, Remi will tell you to ask an admin to configure it first.
 
 ---
 
@@ -159,6 +175,55 @@ See [SETUP.md — Step 14](SETUP.md#step-14-enable-gmail-integration-optional) f
 
 ---
 
+## Confluence doc generation
+
+Remi's Confluence integration is a write-only documentation flow for V1. It does not read existing Confluence pages back into Remi. Instead, it turns the issue context Remi already knows about into a draft page that your team can review, edit, and share.
+
+### What an admin needs to do once
+
+1. Configure the Atlassian OAuth app credentials in the environment:
+   - `CONFLUENCE_CLIENT_ID`
+   - `CONFLUENCE_CLIENT_SECRET`
+2. Authorise the workspace against Confluence using Remi's admin/API flow
+3. Confirm the workspace shows as connected before asking users to run `/doc`
+
+See [SETUP.md — Step 15](SETUP.md#step-15-connect-confluence-optional) for the full setup and OAuth flow.
+
+### What users do day to day
+
+1. Link a Slack thread to a Jira issue with `/link-ticket ISSUE-KEY`
+2. Let work happen normally in Slack and Jira
+3. Optionally enable Gmail so linked issue emails can also appear in the generated doc context
+4. Run `/doc ISSUE-KEY handoff`, `/doc ISSUE-KEY summary`, or `/doc ISSUE-KEY escalation`
+5. Open the Confluence link Remi posts back into Slack, then refine the draft for your audience
+
+### What Remi puts into the page
+
+- The Jira issue header: key, title, status, assignee, priority, and department when available
+- A timeline of important Jira state changes such as status, assignee, and priority updates
+- Key decisions, blockers, and open questions pulled from Remi's newer structured memory observations when available
+- Linked Slack threads and participants involved in the work
+- Related email threads when Gmail is enabled and email links exist for that issue
+- A generated-at footer showing the page was assembled from Slack, Jira, and linked email data
+
+### Supported doc types
+
+- `handoff` is the default and is best for passing work between people or shifts
+- `summary` is best for capturing the current state of an issue in a compact format
+- `escalation` is best when you need a brief that can be shared upward or cross-functionally
+
+### How Confluence decides where the page goes
+
+By default, Remi creates the page in the Confluence space whose key matches the Jira project prefix. For example, `PROJ-123` is written to the `PROJ` Confluence space unless you later add workspace-level routing.
+
+### What makes this different from a normal meeting note
+
+- It is deterministic: no LLM-generated prose, no hallucinated facts
+- It is traceable: content comes from linked Slack threads, Jira events, and linked emails already captured by Remi
+- It fits the new feature set: as Remi's memory layer gets richer, the generated Confluence page inherits better structured decisions, blockers, and open questions without changing how users invoke `/doc`
+
+---
+
 ## Admin dashboard
 
 The admin dashboard at [admin.memoremi.com](https://admin.memoremi.com) is for operators, not end users. It shows:
@@ -168,7 +233,7 @@ The admin dashboard at [admin.memoremi.com](https://admin.memoremi.com) is for o
 - **Dead Letters** — failed jobs that need attention, with a retry button
 - **Audit Log** — complete record of every action Remi has taken
 - **Analytics** — feature usage counts (`link_ticket_used`, `brief_viewed`, etc.) across all workspaces
-- **Integrations** — configure Slack, Jira, Gmail, and Outlook settings per workspace
+- **Integrations** — configure Slack, Jira, Gmail, Outlook, and Confluence settings per workspace
 - **Memory** — view autonomous memory units and pending writeback proposals per workspace; approve or reject proposals before they are applied to Jira
 
 
@@ -207,6 +272,7 @@ packages/
   slack/          Slack Bolt handlers, commands, views, OAuth
   jira/           Jira Connect auth, REST client, webhook parser, panel
   gmail/          Gmail sync client, issue key detection, Slack DM notifications
+  confluence/     Confluence Cloud REST client, IssueDocContext builder, page renderer
   summary-engine/ Deterministic summary generation
 ```
 
@@ -216,7 +282,7 @@ packages/
 
 The connector architecture (Workspace → `*Install`) is designed to extend to:
 - Outlook (email connector — Gmail is already implemented)
-- Confluence / Notion (docs)
+- Notion (same doc-generation pattern as Confluence)
 - Linear, GitHub Issues
 - LLM-based summary rewriting (drop-in replacement for `packages/summary-engine`)
 - Role-based permissions
