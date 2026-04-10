@@ -7,7 +7,7 @@ import {
   getMemoryConfig,
 } from '@remi/db';
 import type { JiraEventMessage } from '@remi/shared';
-import { QueueNames, TriggerReason } from '@remi/shared';
+import { QueueNames, TriggerReason, JiraStatusCategory } from '@remi/shared';
 import type { IQueueProducer } from '@remi/queue';
 import { shouldTriggerSummary } from '@remi/summary-engine';
 import { isIssueEventProcessed } from '../dedup.js';
@@ -204,6 +204,55 @@ export async function handleJiraEvent(
         type: 'memory_extract',
         payload: { memoryUnitId: unit.id, sourceType: 'jira_event', sourceId: issueEvent.id },
       });
+    }
+  }
+
+  // ── Proactive doc trigger: auto-generate handoff doc when issue moves to Done ──
+  if (
+    derivedEventType === 'status_changed' &&
+    issue.statusCategory === JiraStatusCategory.DONE
+  ) {
+    const confluenceInstall = await prisma.confluenceWorkspaceInstall.findUnique({
+      where: { workspaceId: workspace.id },
+    });
+
+    if (confluenceInstall) {
+      // Find the Slack channel with the most recently active linked thread
+      const activeThreadLinks = await prisma.issueThreadLink.findMany({
+        where: { issueId: issue.id, unlinkedAt: null },
+        include: {
+          thread: {
+            include: { messages: { orderBy: { sentAt: 'desc' }, take: 1 } },
+          },
+        },
+      });
+
+      const latestLink =
+        activeThreadLinks
+          .filter((l) => l.thread.messages.length > 0)
+          .sort(
+            (a, b) =>
+              b.thread.messages[0]!.sentAt.getTime() -
+              a.thread.messages[0]!.sentAt.getTime(),
+          )[0] ?? activeThreadLinks[0] ?? null;
+
+      const triggerChannelId = latestLink?.thread.channelId ?? null;
+
+      await queue.send(QueueNames.DOC_GENERATE_JOBS, {
+        id: uuidv4(),
+        idempotencyKey: `doc:auto:${issue.id}:${issueEvent.id}`,
+        workspaceId: workspace.id,
+        timestamp: new Date().toISOString(),
+        type: 'doc_generate_job',
+        payload: {
+          issueId: issue.id,
+          issueKey: payload.issueKey,
+          docType: 'handoff',
+          triggerChannelId,
+          autoTriggered: true,
+        },
+      });
+      console.log(`[jira-events] Enqueued auto handoff doc for Done issue ${issue.id}, channel: ${triggerChannelId}`);
     }
   }
 
