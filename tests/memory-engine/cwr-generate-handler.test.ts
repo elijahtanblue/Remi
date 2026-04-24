@@ -164,4 +164,44 @@ describe('handleCwrGenerate', () => {
 
     expect(mockRunCwrSynthesis).toHaveBeenCalled();
   });
+
+  it('bypasses hash check for link_change trigger', async () => {
+    mockIssue();
+    mockComputeSnapshotSetHash.mockReturnValue('same-hash');
+    vi.mocked(prisma.memoryUnit.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.currentWorkRecord.findUnique).mockResolvedValue({
+      id: 'cwr1',
+      snapshotSetHash: 'same-hash',
+      isStale: false,
+      blockerSummary: null,
+      ownerExternalId: null,
+      waitingOnType: null,
+      waitingOnDescription: null,
+      nextStep: null,
+      lastJiraStatus: null,
+    } as any);
+    mockRunCwrSynthesis.mockResolvedValue({
+      currentState: 'In progress',
+      ownerDisplayName: null,
+      ownerExternalId: null,
+      ownerSource: null,
+      blockerSummary: null,
+      waitingOnType: null,
+      waitingOnDescription: null,
+      openQuestions: [],
+      nextStep: null,
+      riskScore: 0.2,
+      urgencyReason: null,
+      isStale: false,
+      confidence: 0.8,
+      dataSources: ['slack'],
+    });
+    vi.mocked(prisma.$transaction).mockImplementation((fn: any) => fn(prisma));
+    vi.mocked(prisma.currentWorkRecord.upsert).mockResolvedValue({ id: 'cwr1' } as any);
+    vi.mocked(prisma.productEvent.create).mockResolvedValue({} as any);
+
+    await handleCwrGenerate(makeMessage('link_change'), cwrDeps());
+
+    expect(mockRunCwrSynthesis).toHaveBeenCalled();
+  });
 });

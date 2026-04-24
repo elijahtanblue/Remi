@@ -262,6 +262,15 @@ export function registerLinkTicketCommand(app: App, queue: IQueueProducer): void
         },
       });
 
+      await queue.send(QueueNames.CWR_GENERATE, {
+        id: uuidv4(),
+        idempotencyKey: `cwr-generate:${issue.id}:link:${link.id}`,
+        workspaceId,
+        timestamp: new Date().toISOString(),
+        type: 'cwr_generate',
+        payload: { issueId: issue.id, triggerSource: 'link_change' },
+      });
+
       // 10. Write AuditLog
       await createAuditLog(prisma, {
         workspaceId,

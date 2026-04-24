@@ -185,6 +185,15 @@ export function registerAttachThreadShortcut(app: App, queue: IQueueProducer): v
         },
       });
 
+      await queue.send(QueueNames.CWR_GENERATE, {
+        id: uuidv4(),
+        idempotencyKey: `cwr-generate:${issue.id}:link:${link.id}`,
+        workspaceId,
+        timestamp: new Date().toISOString(),
+        type: 'cwr_generate',
+        payload: { issueId: issue.id, triggerSource: 'link_change' },
+      });
+
       // Write AuditLog
       await createAuditLog(prisma, {
         workspaceId,

@@ -95,7 +95,10 @@ export async function handleCwrGenerate(
 
   const existingCwr = await prisma.currentWorkRecord.findUnique({ where: { issueId } });
 
-  if (triggerSource !== 'stale_sweep' && existingCwr?.snapshotSetHash === snapshotSetHash) {
+  if (
+    (triggerSource === 'stage2_complete' || triggerSource === 'jira_change') &&
+    existingCwr?.snapshotSetHash === snapshotSetHash
+  ) {
     console.log(`[cwr-generate] Hash unchanged for ${issueId}, skipping`);
     return;
   }
