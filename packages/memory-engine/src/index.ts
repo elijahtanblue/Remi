@@ -5,4 +5,5 @@ export * from './clients/openai.js';
 export * from './pipeline/stage1-extract.js';
 export * from './pipeline/stage2-snapshot.js';
 export * from './pipeline/stage3-propose.js';
+export * from './pipeline/cwr.js';
 export * from './pipeline/run.js';
