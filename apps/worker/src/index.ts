@@ -7,11 +7,12 @@ import { handleJiraEvent } from './handlers/jira-events.js';
 import { handleSlackEvent } from './handlers/slack-events.js';
 import { handleSummaryJob } from './handlers/summary-jobs.js';
 import { handleBackfillJob } from './handlers/backfill-jobs.js';
-import type { JiraEventMessage, SlackEventMessage, SummaryJobMessage, BackfillJobMessage, DocGenerateJobMessage, CWRGenerateMessage } from '@remi/shared';
+import type { JiraEventMessage, SlackEventMessage, SummaryJobMessage, BackfillJobMessage, DocGenerateJobMessage, CWRGenerateMessage, RiskDigestMessage } from '@remi/shared';
 import type { MemoryExtractMessage, MemorySnapshotMessage, MemoryWritebackProposeMessage, MemoryWritebackApplyMessage } from '@remi/shared';
 import { handleMemoryExtract, handleMemorySnapshot, handleMemoryWritebackPropose, handleMemoryWritebackApply } from './handlers/memory-jobs.js';
 import { handleDocGenerateJob } from './handlers/doc-generate-jobs.js';
 import { handleCwrGenerate } from './handlers/cwr-generate.js';
+import { handleRiskDigestJob } from './handlers/risk-digest.js';
 import { syncAllGmailWorkspaces } from '@remi/gmail';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -30,6 +31,7 @@ const queue =
           [QueueNames.MEMORY_WRITEBACK_APPLY]: config.SQS_MEMORY_WRITEBACK_APPLY_URL ?? '',
           [QueueNames.DOC_GENERATE_JOBS]: config.SQS_DOC_GENERATE_JOBS_URL ?? '',
           [QueueNames.CWR_GENERATE]: config.SQS_CWR_GENERATE_URL ?? '',
+          [QueueNames.RISK_DIGEST]: config.SQS_RISK_DIGEST_URL ?? '',
         },
       })
     : new MemoryQueueAdapter();
@@ -72,6 +74,10 @@ startConsumer(queue, QueueNames.CWR_GENERATE, (msg) =>
   handleCwrGenerate(msg as CWRGenerateMessage),
 );
 
+startConsumer(queue, QueueNames.RISK_DIGEST, (msg) =>
+  handleRiskDigestJob(msg as RiskDigestMessage),
+);
+
 console.log(`[worker] Started consuming queues: ${Object.values(QueueNames).join(', ')}`);
 
 // ─── Gmail batch sync ─────────────────────────────────────────────────────────
@@ -82,6 +88,7 @@ const GMAIL_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
 let gmailSyncTimer: ReturnType<typeof setInterval> | undefined;
 let cwrStaleSweepTimer: ReturnType<typeof setInterval> | undefined;
+let riskDigestTimer: ReturnType<typeof setInterval> | undefined;
 
 if (config.GMAIL_SYNC_ENABLED) {
   syncAllGmailWorkspaces(queue).catch((err: unknown) =>
@@ -113,6 +120,20 @@ async function runCwrStaleSweep(): Promise<void> {
   console.log(`[cwr-stale-sweep] Enqueued ${cwrs.length} CWR sweep jobs`);
 }
 
+async function enqueueRiskDigest(): Promise<void> {
+  const periodKey = `weekly:${Math.floor(Date.now() / config.RISK_DIGEST_INTERVAL_MS)}`;
+  await queue.send(QueueNames.RISK_DIGEST, {
+    id: uuidv4(),
+    idempotencyKey: `risk-digest:${periodKey}`,
+    workspaceId: 'system',
+    timestamp: new Date().toISOString(),
+    type: 'risk_digest',
+    payload: { cadence: 'weekly', periodKey },
+  });
+
+  console.log('[risk-digest] Enqueued weekly digest job');
+}
+
 if (config.CWR_STALE_SWEEP_INTERVAL_MS > 0) {
   runCwrStaleSweep().catch((err: unknown) =>
     console.error('[cwr-stale-sweep] Initial sweep error:', err),
@@ -124,10 +145,19 @@ if (config.CWR_STALE_SWEEP_INTERVAL_MS > 0) {
   }, config.CWR_STALE_SWEEP_INTERVAL_MS);
 }
 
+if (config.RISK_DIGEST_SCHEDULER_ENABLED && config.RISK_DIGEST_INTERVAL_MS > 0) {
+  riskDigestTimer = setInterval(() => {
+    enqueueRiskDigest().catch((err: unknown) =>
+      console.error('[risk-digest] Enqueue error:', err),
+    );
+  }, config.RISK_DIGEST_INTERVAL_MS);
+}
+
 process.on('SIGTERM', async () => {
   console.log('[worker] SIGTERM received, stopping...');
   if (gmailSyncTimer) clearInterval(gmailSyncTimer);
   if (cwrStaleSweepTimer) clearInterval(cwrStaleSweepTimer);
+  if (riskDigestTimer) clearInterval(riskDigestTimer);
   await queue.stop();
   process.exit(0);
 });

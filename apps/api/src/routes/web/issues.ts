@@ -5,6 +5,7 @@ import {
   findMeaningfulEventsByIssue,
   prisma,
 } from '@remi/db';
+import type { Prisma } from '@remi/db';
 import type {
   CWRDetail,
   CWRSummary,
@@ -63,19 +64,102 @@ function logEvent(workspaceId: string, userId: string, event: string, properties
   ).catch(() => {});
 }
 
+async function findProposalAnchor(issueId: string) {
+  const unit = await prisma.memoryUnit.findFirst({
+    where: {
+      issueId,
+      snapshots: { some: {} },
+    },
+    include: {
+      snapshots: { orderBy: { version: 'desc' }, take: 1 },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (!unit || unit.snapshots.length === 0) return null;
+  return { unit, snapshot: unit.snapshots[0]! };
+}
+
+async function createJiraCommentProposal(params: {
+  issueKey: string;
+  commentBody: string;
+  memoryUnitId: string;
+  snapshotId: string;
+  confidence: number;
+}) {
+  const { issueKey, commentBody, memoryUnitId, snapshotId, confidence } = params;
+  return prisma.memoryWritebackProposal.create({
+    data: {
+      memoryUnitId,
+      snapshotId,
+      target: 'jira_comment',
+      status: 'pending_approval',
+      payload: { jiraIssueKey: issueKey, commentBody },
+      citationIds: [],
+      confidence,
+      modelId: 'cwr-draft',
+      promptVersion: '1.0',
+    },
+  });
+}
+
+function queueWhere(
+  workspaceId: string,
+  scopeId: string | undefined,
+  section: string,
+): Prisma.IssueWhereInput {
+  const baseWhere: Prisma.IssueWhereInput = {
+    workspaceId,
+    ...(scopeId ? { scopeId } : {}),
+  };
+  const needsActionWhere: Prisma.IssueWhereInput = {
+    currentWorkRecord: {
+      is: {
+        OR: [{ isStale: true }, { riskScore: { gte: 0.6 } }],
+      },
+    },
+  };
+  const awaitingApprovalWhere: Prisma.IssueWhereInput = {
+    currentWorkRecord: {
+      is: {
+        isStale: false,
+        riskScore: { lt: 0.6 },
+      },
+    },
+    memoryUnits: {
+      some: {
+        proposals: { some: { status: 'pending_approval' } },
+      },
+    },
+  };
+
+  if (section === 'needs_action') return { AND: [baseWhere, needsActionWhere] };
+  if (section === 'awaiting_approval') return { AND: [baseWhere, awaitingApprovalWhere] };
+  if (section === 'recently_changed') {
+    return { AND: [baseWhere, { NOT: [needsActionWhere, awaitingApprovalWhere] }] };
+  }
+  return baseWhere;
+}
+
+function positiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.floor(parsed));
+}
+
 export async function issueRoutes(app: FastifyInstance) {
   app.get<{
     Querystring: { section?: string; scopeId?: string; page?: string; limit?: string };
   }>('/issues', async (request) => {
     const { section = 'all', scopeId, page = '1', limit = '50' } = request.query;
-    const pageNum = Math.max(1, Number(page));
-    const limitNum = Math.min(100, Math.max(1, Number(limit)));
+    const pageNum = positiveInt(page, 1);
+    const limitNum = Math.min(100, positiveInt(limit, 50));
+    const offset = (pageNum - 1) * limitNum;
+    const where = queueWhere(request.workspaceId, scopeId, section);
 
-    const issues = await prisma.issue.findMany({
-      where: {
-        workspaceId: request.workspaceId,
-        ...(scopeId ? { scopeId } : {}),
-      },
+    const [issues, total] = await Promise.all([
+      prisma.issue.findMany({
+        where,
       include: {
         currentWorkRecord: true,
         scope: { select: { id: true, name: true } },
@@ -88,17 +172,20 @@ export async function issueRoutes(app: FastifyInstance) {
         },
       },
       orderBy: [{ updatedAt: 'desc' }],
-    });
+        skip: offset,
+        take: limitNum,
+      }),
+      prisma.issue.count({ where }),
+    ]);
 
-    const mapped: IssueQueueItem[] = issues.flatMap((issue: any) => {
+    const items: IssueQueueItem[] = issues.map((issue: any) => {
       const pendingProposalCount = issue.memoryUnits.reduce(
         (sum: number, unit: any) => sum + unit._count.proposals,
         0,
       );
       const queueSection = computeQueueSection(issue.currentWorkRecord, pendingProposalCount);
-      if (section !== 'all' && queueSection !== section) return [];
 
-      return [{
+      return {
         id: issue.id,
         jiraIssueKey: issue.jiraIssueKey,
         jiraIssueUrl: jiraUrl(issue),
@@ -110,16 +197,14 @@ export async function issueRoutes(app: FastifyInstance) {
         cwr: issue.currentWorkRecord ? mapCwrSummary(issue.currentWorkRecord) : null,
         queueSection,
         pendingProposalCount,
-      }];
+      };
     });
 
-    const offset = (pageNum - 1) * limitNum;
-    const items = mapped.slice(offset, offset + limitNum);
     logEvent(request.workspaceId, request.userId, 'issue_queue_viewed', {
       section,
       count: items.length,
     });
-    return { items, total: mapped.length };
+    return { items, total };
   });
 
   app.get<{ Params: { id: string } }>('/issues/:id', async (request, reply) => {
@@ -256,9 +341,106 @@ export async function issueRoutes(app: FastifyInstance) {
       return { proposalId: null, message: 'Blocker marked as cleared.' };
     }
 
+    if (request.body.type === 'draft_update') {
+      const cwr = issue.currentWorkRecord;
+      if (!cwr) {
+        return reply.code(400).send({ error: 'No current state available to draft an update from.' });
+      }
+
+      const anchor = await findProposalAnchor(issue.id);
+      if (!anchor) {
+        return { proposalId: null, message: 'No memory snapshot to attach the proposal to. Ingest a Slack thread first.' };
+      }
+
+      const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const lines: string[] = [`*Status update — ${today}*`, '', cwr.currentState];
+      if (cwr.ownerDisplayName) lines.push('', `Owner: ${cwr.ownerDisplayName}`);
+      if (cwr.waitingOnDescription) lines.push(`Waiting on: ${cwr.waitingOnDescription}`);
+      if (cwr.nextStep) lines.push(`Next step: ${cwr.nextStep}`);
+      if (cwr.blockerSummary) lines.push('', `⚠ Blocker: ${cwr.blockerSummary}`);
+      const commentBody = lines.join('\n');
+
+      const proposal = await createJiraCommentProposal({
+        issueKey: issue.jiraIssueKey,
+        commentBody,
+        memoryUnitId: anchor.unit.id,
+        snapshotId: anchor.snapshot.id,
+        confidence: cwr.confidence,
+      });
+
+      logEvent(request.workspaceId, request.userId, 'draft_update_created', {
+        issueId: issue.id,
+        proposalId: proposal.id,
+      });
+      return { proposalId: proposal.id, message: 'Draft update created — check Approvals to review and post.' };
+    }
+
+    if (request.body.type === 'chase_owner') {
+      const cwr = issue.currentWorkRecord;
+      if (!cwr?.ownerDisplayName) {
+        return reply.code(400).send({ error: 'No owner available to chase.' });
+      }
+
+      const anchor = await findProposalAnchor(issue.id);
+      if (!anchor) {
+        return { proposalId: null, message: 'No linked thread to attach the proposal to.' };
+      }
+
+      const commentBody = [
+        `Hi ${cwr.ownerDisplayName}, following up on ${issue.jiraIssueKey} — ${cwr.currentState}.`,
+        `Next step: ${cwr.nextStep ?? 'Please confirm current status'}.`,
+        'Can you provide an update?',
+      ].join('\n');
+
+      const proposal = await createJiraCommentProposal({
+        issueKey: issue.jiraIssueKey,
+        commentBody,
+        memoryUnitId: anchor.unit.id,
+        snapshotId: anchor.snapshot.id,
+        confidence: cwr.confidence,
+      });
+
+      return { proposalId: proposal.id, message: 'Chase drafted — review in Approvals.' };
+    }
+
+    if (request.body.type === 'prepare_escalation') {
+      const cwr = issue.currentWorkRecord;
+      if (!cwr) {
+        return reply.code(400).send({ error: 'No current state available to prepare escalation from.' });
+      }
+
+      const anchor = await findProposalAnchor(issue.id);
+      if (!anchor) {
+        return { proposalId: null, message: 'No linked thread to attach the proposal to.' };
+      }
+
+      const lines = [
+        `*Escalation Summary — ${issue.jiraIssueKey}*`,
+        `*Issue:* ${issue.title}`,
+        `*Current state:* ${cwr.currentState}`,
+      ];
+      if (cwr.ownerDisplayName) lines.push(`*Owner:* ${cwr.ownerDisplayName}`);
+      if (cwr.waitingOnDescription) lines.push(`*Waiting on:* ${cwr.waitingOnDescription}`);
+      if (cwr.blockerSummary) lines.push(`*Blocker:* ${cwr.blockerSummary}`);
+      if (cwr.nextStep) lines.push(`*Recommended next step:* ${cwr.nextStep}`);
+      lines.push(`*Risk:* ${Math.round(cwr.riskScore * 100)}% · Confidence: ${Math.round(cwr.confidence * 100)}%`);
+      lines.push(`*Sources:* ${cwr.dataSources.join(', ')}`);
+      if (cwr.isStale) lines.push('⚠ This issue has gone stale.');
+
+      const proposal = await createJiraCommentProposal({
+        issueKey: issue.jiraIssueKey,
+        commentBody: lines.join('\n'),
+        memoryUnitId: anchor.unit.id,
+        snapshotId: anchor.snapshot.id,
+        confidence: cwr.confidence,
+      });
+
+      return { proposalId: proposal.id, message: 'Escalation pack ready — review in Approvals.' };
+    }
+
     return {
       proposalId: null,
-      message: `Action '${request.body.type}' received. Full generation coming in a follow-on release.`,
+      message: `Action '${request.body.type}' queued.`,
     };
   });
 }

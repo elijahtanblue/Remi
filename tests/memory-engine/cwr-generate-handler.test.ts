@@ -204,4 +204,61 @@ describe('handleCwrGenerate', () => {
 
     expect(mockRunCwrSynthesis).toHaveBeenCalled();
   });
+
+  it('applies heuristic risk boosts and stale detection from timestamps', async () => {
+    mockIssue();
+    vi.mocked(prisma.memoryUnit.findMany).mockResolvedValue([{ id: 'mu1' }] as any);
+    vi.mocked(prisma.memorySnapshot.findFirst).mockResolvedValue({
+      id: 'snap1',
+      memoryUnitId: 'mu1',
+      version: 1,
+      headline: 'Latest thread state',
+      currentState: 'Still waiting on vendor response',
+      freshness: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+    } as any);
+    mockComputeSnapshotSetHash.mockReturnValue('new-hash');
+    vi.mocked(prisma.currentWorkRecord.findUnique).mockResolvedValue({
+      id: 'cwr1',
+      snapshotSetHash: 'old-hash',
+      isStale: false,
+      blockerSummary: 'Vendor callback still failing',
+      blockerDetectedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+      ownerExternalId: null,
+      waitingOnType: 'external_vendor',
+      waitingOnDescription: 'Vendor to restore webhook access',
+      nextStep: 'Escalate through vendor manager',
+      lastJiraStatus: null,
+      lastMeaningfulChangeAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+      lastMeaningfulChangeSummary: 'Waiting on vendor response',
+    } as any);
+    mockRunCwrSynthesis.mockResolvedValue({
+      currentState: 'Still waiting on vendor response',
+      ownerDisplayName: null,
+      ownerExternalId: null,
+      ownerSource: null,
+      blockerSummary: 'Vendor callback still failing',
+      waitingOnType: 'external_vendor',
+      waitingOnDescription: 'Vendor to restore webhook access',
+      openQuestions: [],
+      nextStep: 'Escalate through vendor manager',
+      riskScore: 0.75,
+      urgencyReason: null,
+      isStale: false,
+      confidence: 0.8,
+      dataSources: ['slack'],
+    });
+    vi.mocked(prisma.$transaction).mockImplementation((fn: any) => fn(prisma));
+    vi.mocked(prisma.currentWorkRecord.upsert).mockResolvedValue({ id: 'cwr1' } as any);
+    vi.mocked(prisma.productEvent.create).mockResolvedValue({} as any);
+
+    await handleCwrGenerate(makeMessage('stage2_complete'), cwrDeps());
+
+    expect(prisma.currentWorkRecord.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({
+        riskScore: 1,
+        isStale: true,
+      }),
+    }));
+  });
 });

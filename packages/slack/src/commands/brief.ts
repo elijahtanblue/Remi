@@ -2,7 +2,7 @@ import type { App } from '@slack/bolt';
 import { v4 as uuidv4 } from 'uuid';
 import { QueueNames } from '@remi/shared';
 import type { IQueueProducer } from '@remi/queue';
-import { prisma, findIssueByKey, createProductEvent, getMemoryConfig, getLatestSnapshot } from '@remi/db';
+import { prisma, findIssueByKey, createProductEvent, findCwrByIssueId, getMemoryConfig, getLatestSnapshot } from '@remi/db';
 import { generateSummary } from '@remi/summary-engine';
 import { JiraClient } from '@remi/jira';
 import { buildBriefBlocks } from '../views/brief-blocks.js';
@@ -37,7 +37,64 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
         return;
       }
 
-      // 3. Check if the Current Work Record pipeline is enabled for this workspace
+      // 3. Prefer the structured CurrentWorkRecord if it exists
+      const cwr = await findCwrByIssueId(prisma, issue.id);
+      if (cwr) {
+        const risk = Math.round(cwr.riskScore * 100);
+        const conf = Math.round(cwr.confidence * 100);
+        const updatedAt = cwr.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const sourceLabel = cwr.dataSources.length > 0
+          ? `Sources: ${cwr.dataSources.map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')} · `
+          : '';
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const blocks: any[] = [
+          { type: 'header', text: { type: 'plain_text', text: `${issueKey} — Current Brief`, emoji: true } },
+          { type: 'section', text: { type: 'mrkdwn', text: cwr.currentState } },
+          {
+            type: 'context',
+            elements: [{
+              type: 'mrkdwn',
+              text: [
+                cwr.ownerDisplayName ? `Owner: *${cwr.ownerDisplayName}*` : null,
+                `Risk: *${risk}%*`,
+                `Confidence: ${conf}%`,
+                `${sourceLabel}Updated ${updatedAt}`,
+              ].filter(Boolean).join(' · '),
+            }],
+          },
+        ];
+
+        if (cwr.waitingOnDescription || cwr.waitingOnType) {
+          blocks.push({ type: 'divider' });
+          blocks.push({
+            type: 'section',
+            text: { type: 'mrkdwn', text: `*Waiting on*\n${cwr.waitingOnDescription ?? cwr.waitingOnType}` },
+          });
+        }
+        if (cwr.nextStep) {
+          if (!cwr.waitingOnDescription && !cwr.waitingOnType) blocks.push({ type: 'divider' });
+          blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*Next step*\n${cwr.nextStep}` } });
+        }
+        if (cwr.blockerSummary) {
+          blocks.push({ type: 'divider' });
+          blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*Blocker*\n🔴 ${cwr.blockerSummary}` } });
+        }
+        if (cwr.isStale) {
+          blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '⚠ This issue is marked stale — no update has been received recently.' }] });
+        }
+
+        void createProductEvent(prisma, {
+          workspaceId,
+          event: 'cwr_brief_viewed',
+          actorId: command.user_id,
+          properties: { issueKey, riskScore: cwr.riskScore },
+        }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
+        await respond({ response_type: 'in_channel', blocks, text: `Current brief for *${issueKey}*` });
+        return;
+      }
+
+      // 3b. Fall back to snapshot-merging if no CWR but snapshots exist
       const memConfig = await getMemoryConfig(prisma, workspaceId);
       if (memConfig?.enabled) {
         const units = await prisma.memoryUnit.findMany({
@@ -46,18 +103,14 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
         });
 
         if (units.length > 0) {
-          // Fetch all snapshots across all memory units (Slack threads, email threads, etc.)
           const allSnapshots = (
             await Promise.all(units.map((u) => getLatestSnapshot(prisma, u.id)))
           ).filter((s): s is NonNullable<typeof s> => s !== null);
 
           if (allSnapshots.length > 0) {
-            // Use the highest-confidence snapshot as the base narrative
             const base = allSnapshots.reduce((best, s) =>
               s.confidence > best.confidence ? s : best, allSnapshots[0]!
             );
-
-            // Merge arrays across all snapshots, deduplicating by value
             const keyDecisions = [...new Set(
               allSnapshots.flatMap(s => Array.isArray(s.keyDecisions) ? (s.keyDecisions as string[]) : [])
             )];
@@ -67,7 +120,6 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
             const openQuestions = [...new Set(
               allSnapshots.flatMap(s => Array.isArray(s.openQuestions) ? (s.openQuestions as string[]) : [])
             )];
-            // Deduplicate open actions by description (case-insensitive)
             const seenActions = new Set<string>();
             const openActions = allSnapshots
               .flatMap(s => Array.isArray(s.openActions) ? (s.openActions as Array<{ description: string; assignee?: string }>) : [])
@@ -77,23 +129,19 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
                 seenActions.add(key);
                 return true;
               });
-            // Collect data sources across all snapshots
             const dataSources = [...new Set(
               allSnapshots.flatMap(s => Array.isArray(s.dataSources) ? (s.dataSources as string[]) : [])
             )];
-
             const freshness = new Date(base.freshness).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             const sourceLabel = dataSources.length > 1
               ? `Sources: ${dataSources.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')} · `
               : '';
-
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const blocks: any[] = [
               { type: 'header', text: { type: 'plain_text', text: `${issueKey} — Current Work Record`, emoji: true } },
               { type: 'section', text: { type: 'mrkdwn', text: `*${base.headline}*\n${base.currentState}` } },
               { type: 'context', elements: [{ type: 'mrkdwn', text: `${sourceLabel}Confidence: ${Math.round(base.confidence * 100)}% · Updated ${freshness}` }] },
             ];
-
             if (keyDecisions.length > 0) {
               blocks.push({ type: 'divider' });
               blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*Key Decisions*\n${keyDecisions.map(d => `• ${d}`).join('\n')}` } });
@@ -109,7 +157,6 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
             if (openQuestions.length > 0) {
               blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*Open Questions*\n${openQuestions.map(q => `❓ ${q}`).join('\n')}` } });
             }
-
             void createProductEvent(prisma, {
               workspaceId,
               event: 'memory_brief_viewed',
@@ -121,7 +168,7 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
           }
         }
       }
-      // Falls through to the legacy brief path if no Current Work Record snapshot exists
+      // Falls through to the legacy brief path if no CWR or snapshots exist
 
       // 4. If issue data is still placeholder (Jira backfill hasn't completed yet),
       //    trigger a Jira backfill and ask the user to check back.

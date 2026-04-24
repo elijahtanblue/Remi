@@ -17,6 +17,20 @@ import type {
 
 const USE_MOCK = process.env.USE_MOCK_DATA === 'true';
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export function isApiStatus(err: unknown, status: number): boolean {
+  return err instanceof ApiError && err.status === status;
+}
+
 // ─── Mock fixtures ────────────────────────────────────────────────────────────
 
 const mockCwrBase: CWRSummary = {
@@ -291,7 +305,7 @@ async function apiFetch<T>(
     headers: { ...headers(userId, workspaceId), ...(init?.headers as Record<string, string> ?? {}) },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`API ${path} → ${res.status}`);
+  if (!res.ok) throw new ApiError(`API ${path} returned ${res.status}`, res.status);
   return res.json() as Promise<T>;
 }
 

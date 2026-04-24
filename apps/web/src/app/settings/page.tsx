@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { getWorkflowConfigs, getScopes } from '@/lib/api-client';
 import type { WorkflowConfigItem, ScopeItem } from '@remi/shared';
+import CreateConfigForm from './create-config-form';
 
 function ConfigCard({ config, scopes }: { config: WorkflowConfigItem; scopes: ScopeItem[] }) {
   const scope = scopes.find((s) => s.id === config.scopeId);
@@ -74,15 +75,12 @@ export default async function SettingsPage() {
           </p>
         </div>
 
-        {configs.length === 0 ? (
-          <p style={styles.empty}>No workflow configs yet.</p>
-        ) : (
-          <div style={styles.list}>
-            {configs.map((config) => (
-              <ConfigCard key={config.id} config={config} scopes={scopes} />
-            ))}
-          </div>
-        )}
+        <div style={styles.list}>
+          {configs.map((config) => (
+            <ConfigCard key={config.id} config={config} scopes={scopes} />
+          ))}
+          <CreateConfigForm scopes={scopes} />
+        </div>
       </section>
 
       <section style={styles.section}>

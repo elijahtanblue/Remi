@@ -132,6 +132,14 @@ export interface CWRGenerateMessage extends BaseQueueMessage {
   };
 }
 
+export interface RiskDigestMessage extends BaseQueueMessage {
+  type: 'risk_digest';
+  payload: {
+    cadence: 'weekly';
+    periodKey?: string;
+  };
+}
+
 // ─── Union ───
 
 export type QueueMessage =
@@ -144,4 +152,5 @@ export type QueueMessage =
   | MemoryWritebackProposeMessage
   | MemoryWritebackApplyMessage
   | DocGenerateJobMessage
-  | CWRGenerateMessage;
+  | CWRGenerateMessage
+  | RiskDigestMessage;

@@ -11,12 +11,63 @@ import {
 } from '@remi/memory-engine';
 import { v4 as uuidv4 } from 'uuid';
 
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
 function idempotencyKey(cwrId: string, eventType: string, payload: unknown): string {
   const hash = createHash('sha256')
     .update(JSON.stringify(payload ?? {}))
     .digest('hex')
     .slice(0, 12);
   return `cwr:${cwrId}:${eventType}:${hash}`;
+}
+
+function isOlderThan(date: Date | null | undefined, thresholdMs: number, now: Date) {
+  if (!date) return false;
+  return now.getTime() - date.getTime() > thresholdMs;
+}
+
+function applyHeuristics(params: {
+  baseRiskScore: number;
+  waitingOnType: string | null;
+  blockerSummary: string | null;
+  blockerDetectedAt: Date | null;
+  sourceFreshnessAt: Date;
+  lastMeaningfulChangeAt: Date | null;
+  now: Date;
+}) {
+  const {
+    baseRiskScore,
+    waitingOnType,
+    blockerSummary,
+    blockerDetectedAt,
+    sourceFreshnessAt,
+    lastMeaningfulChangeAt,
+    now,
+  } = params;
+
+  let riskScore = baseRiskScore;
+
+  if (isOlderThan(lastMeaningfulChangeAt, 5 * DAY_MS, now)) {
+    riskScore += 0.15;
+  }
+
+  if (waitingOnType === 'external_vendor' || waitingOnType === 'external_customer') {
+    riskScore += 0.10;
+  }
+
+  if (blockerSummary && isOlderThan(blockerDetectedAt, 3 * DAY_MS, now)) {
+    riskScore += 0.10;
+  }
+
+  const isStale =
+    isOlderThan(sourceFreshnessAt, 48 * HOUR_MS, now) &&
+    (!lastMeaningfulChangeAt || isOlderThan(lastMeaningfulChangeAt, 72 * HOUR_MS, now));
+
+  return {
+    riskScore: Math.min(1, riskScore),
+    isStale,
+  };
 }
 
 export type CwrGenerateDependencies = {
@@ -125,11 +176,6 @@ export async function handleCwrGenerate(
     openAiClient,
   );
 
-  if (triggerSource === 'stale_sweep' && existingCwr?.isStale === synthesis.isStale) {
-    console.log(`[cwr-generate] Stale sweep unchanged for ${issueId}, skipping`);
-    return;
-  }
-
   const sourceFreshnessAt =
     snapshots.length > 0
       ? snapshots.reduce(
@@ -140,6 +186,62 @@ export async function handleCwrGenerate(
           snapshots[0]!.freshness ?? snapshots[0]!.createdAt,
         )
       : new Date();
+  const now = new Date();
+  const blockerDetectedAt =
+    synthesis.blockerSummary && !existingCwr?.blockerSummary
+      ? now
+      : existingCwr?.blockerDetectedAt ?? null;
+
+  const prevForDiff = existingCwr ?? {
+    id: 'new',
+    blockerSummary: null,
+    ownerExternalId: null,
+    waitingOnType: null,
+    waitingOnDescription: null,
+    nextStep: null,
+    isStale: false,
+    lastJiraStatus: null,
+  };
+  const nextForDiffBase = {
+    id: existingCwr?.id ?? 'new',
+    blockerSummary: synthesis.blockerSummary,
+    ownerExternalId: synthesis.ownerExternalId,
+    waitingOnType: synthesis.waitingOnType,
+    waitingOnDescription: synthesis.waitingOnDescription,
+    nextStep: synthesis.nextStep,
+    lastJiraStatus: issue.status,
+  };
+  const primarySource = triggerSource === 'jira_change' ? 'jira' : 'slack';
+  const materialEventDrafts = diffRecord(
+    prevForDiff,
+    { ...nextForDiffBase, isStale: prevForDiff.isStale },
+    primarySource,
+  ).filter((event) => event.eventType !== 'stale_detected' && event.eventType !== 'stale_resolved');
+  const lastMeaningfulChangeAt =
+    materialEventDrafts.length > 0 ? now : existingCwr?.lastMeaningfulChangeAt ?? null;
+  const lastMeaningfulChangeSummary =
+    materialEventDrafts.length > 0
+      ? materialEventDrafts[0]!.summary
+      : existingCwr?.lastMeaningfulChangeSummary;
+  const heuristics = applyHeuristics({
+    baseRiskScore: synthesis.riskScore,
+    waitingOnType: synthesis.waitingOnType,
+    blockerSummary: synthesis.blockerSummary,
+    blockerDetectedAt,
+    sourceFreshnessAt,
+    lastMeaningfulChangeAt,
+    now,
+  });
+  const nextForDiff = {
+    ...nextForDiffBase,
+    isStale: heuristics.isStale,
+  };
+  const eventDrafts = diffRecord(prevForDiff, nextForDiff, primarySource);
+
+  if (triggerSource === 'stale_sweep' && existingCwr?.isStale === heuristics.isStale) {
+    console.log(`[cwr-generate] Stale sweep unchanged for ${issueId}, skipping`);
+    return;
+  }
 
   const newCwrData = {
     workspaceId: issue.workspaceId,
@@ -148,21 +250,18 @@ export async function handleCwrGenerate(
     ownerExternalId: synthesis.ownerExternalId,
     ownerSource: synthesis.ownerSource,
     blockerSummary: synthesis.blockerSummary,
-    blockerDetectedAt:
-      synthesis.blockerSummary && !existingCwr?.blockerSummary
-        ? new Date()
-        : existingCwr?.blockerDetectedAt ?? null,
+    blockerDetectedAt,
     waitingOnType: synthesis.waitingOnType,
     waitingOnDescription: synthesis.waitingOnDescription,
     openQuestions: synthesis.openQuestions,
     nextStep: synthesis.nextStep,
-    riskScore: synthesis.riskScore,
+    riskScore: heuristics.riskScore,
     urgencyReason: synthesis.urgencyReason,
-    isStale: synthesis.isStale,
+    isStale: heuristics.isStale,
     staleSince:
-      synthesis.isStale && !existingCwr?.isStale
-        ? new Date()
-        : synthesis.isStale
+      heuristics.isStale && !existingCwr?.isStale
+        ? now
+        : heuristics.isStale
           ? existingCwr?.staleSince ?? null
           : null,
     lastJiraStatus: issue.status,
@@ -177,40 +276,19 @@ export async function handleCwrGenerate(
     promptVersion: PROMPT_VERSIONS.STAGE4_CWR,
   };
 
-  const prevForDiff = existingCwr ?? {
-    id: 'new',
-    blockerSummary: null,
-    ownerExternalId: null,
-    waitingOnType: null,
-    waitingOnDescription: null,
-    nextStep: null,
-    isStale: false,
-    lastJiraStatus: null,
-  };
-  const nextForDiff = {
-    id: existingCwr?.id ?? 'new',
-    blockerSummary: synthesis.blockerSummary,
-    ownerExternalId: synthesis.ownerExternalId,
-    waitingOnType: synthesis.waitingOnType,
-    waitingOnDescription: synthesis.waitingOnDescription,
-    nextStep: synthesis.nextStep,
-    isStale: synthesis.isStale,
-    lastJiraStatus: issue.status,
-  };
-  const primarySource = triggerSource === 'jira_change' ? 'jira' : 'slack';
-  const eventDrafts = diffRecord(prevForDiff, nextForDiff, primarySource);
-
   await prisma.$transaction(async (tx) => {
     const upserted = await tx.currentWorkRecord.upsert({
       where: { issueId },
-      create: { issueId, ...newCwrData } as any,
+      create: {
+        issueId,
+        ...newCwrData,
+        lastMeaningfulChangeAt,
+        lastMeaningfulChangeSummary,
+      } as any,
       update: {
         ...newCwrData,
-        lastMeaningfulChangeAt: eventDrafts.length > 0 ? new Date() : existingCwr?.lastMeaningfulChangeAt,
-        lastMeaningfulChangeSummary:
-          eventDrafts.length > 0
-            ? eventDrafts[0]!.summary
-            : existingCwr?.lastMeaningfulChangeSummary,
+        lastMeaningfulChangeAt,
+        lastMeaningfulChangeSummary,
       } as any,
     });
 

@@ -1,9 +1,10 @@
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getIssueDetail, getIssueTimeline, getIssueEvidence } from '@/lib/api-client';
+import { getIssueDetail, getIssueTimeline, getIssueEvidence, isApiStatus } from '@/lib/api-client';
 import Timeline from '@/components/timeline';
 import EvidencePanel from '@/components/evidence-panel';
+import ActionPanel from '@/components/action-panel';
 import type { CWRDetail, WaitingOnType } from '@remi/shared';
 
 interface Props { params: Promise<{ id: string }> }
@@ -109,13 +110,22 @@ export default async function IssueDetailPage({ params }: Props) {
   const userId      = hdrs.get('x-user-id')      ?? '';
   const workspaceId = hdrs.get('x-workspace-id') ?? '';
 
-  const [issue, { events }, { items: evidence }] = await Promise.all([
-    getIssueDetail(userId, workspaceId, id).catch(() => null),
-    getIssueTimeline(userId, workspaceId, id),
-    getIssueEvidence(userId, workspaceId, id),
-  ]);
-
+  const issue = await getIssueDetail(userId, workspaceId, id).catch((err) => {
+    if (isApiStatus(err, 404)) return null;
+    throw err;
+  });
   if (!issue) notFound();
+
+  const [{ events }, { items: evidence }] = await Promise.all([
+    getIssueTimeline(userId, workspaceId, id).catch((err) => {
+      if (isApiStatus(err, 404)) return { events: [], nextCursor: null };
+      throw err;
+    }),
+    getIssueEvidence(userId, workspaceId, id).catch((err) => {
+      if (isApiStatus(err, 404)) return { items: [] };
+      throw err;
+    }),
+  ]);
 
   return (
     <div>
@@ -162,8 +172,14 @@ export default async function IssueDetailPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Right: timeline */}
+        {/* Right: actions + timeline */}
         <div style={styles.rightCol}>
+          <ActionPanel
+            issueId={issue.id}
+            hasCwr={!!issue.cwr}
+            hasOwner={!!issue.cwr?.ownerDisplayName}
+            hasBlocker={!!issue.cwr?.blockerSummary}
+          />
           <div className="card" style={styles.timelineCard}>
             <h2 style={styles.sectionTitle}>Timeline</h2>
             <Timeline events={events} />
@@ -184,7 +200,7 @@ const styles: Record<string, React.CSSProperties> = {
   issueMeta: { display: 'flex', gap: 6, flexWrap: 'wrap' as const },
   cols: { display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20, alignItems: 'start' },
   leftCol: { display: 'flex', flexDirection: 'column', gap: 16 },
-  rightCol: {},
+  rightCol: { display: 'flex', flexDirection: 'column', gap: 16 },
   cwrCard: { padding: 20 },
   currentState: { fontSize: 14, color: 'var(--remi-ink)', lineHeight: 1.6, marginBottom: 16 },
   fieldGrid: { display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid var(--remi-border)' },

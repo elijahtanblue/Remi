@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '../../apps/api/src/types/fastify.js';
 
 const mockPrisma = vi.hoisted(() => ({
+  scope: {
+    findFirst: vi.fn(),
+  },
   workflowScopeConfig: {
     findUnique: vi.fn(),
   },
@@ -55,6 +58,7 @@ describe('GET /scopes', () => {
 
 describe('POST /workflow-configs', () => {
   it('creates config in the request workspace', async () => {
+    mockPrisma.scope.findFirst.mockResolvedValue({ id: 's1' });
     vi.mocked(createWorkflowConfig).mockResolvedValue({
       id: 'wc1',
       scopeId: 's1',
@@ -89,5 +93,28 @@ describe('POST /workflow-configs', () => {
       expect.anything(),
       expect.objectContaining({ workspaceId: 'ws1' }),
     );
+  });
+
+  it('rejects configs for scopes outside the request workspace', async () => {
+    mockPrisma.scope.findFirst.mockResolvedValue(null);
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/workflow-configs',
+      payload: {
+        scopeId: 'scope-from-another-workspace',
+        workflowKey: 'vendor-escalation',
+        name: 'Vendor Escalation',
+        includedChannelIds: [],
+        includedJiraProjects: [],
+        includedMailboxes: [],
+        writebackEnabled: false,
+        approvalRequired: true,
+      },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(createWorkflowConfig).not.toHaveBeenCalled();
   });
 });

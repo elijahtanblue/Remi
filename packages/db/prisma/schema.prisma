@@ -379,6 +379,20 @@ model QueueDeadLetter {
   @@map("queue_dead_letters")
 }
 
+model ScheduledJobRun {
+  id          String   @id @default(cuid())
+  jobName     String
+  periodKey   String
+  status      String   @default("reserved")
+  messageId   String?
+  createdAt   DateTime @default(now())
+  enqueuedAt  DateTime?
+
+  @@unique([jobName, periodKey])
+  @@index([jobName, createdAt])
+  @@map("scheduled_job_runs")
+}
+
 // ─── Confluence Integration ───────────────────────────────────────────────────
 
 model ConfluenceWorkspaceInstall {

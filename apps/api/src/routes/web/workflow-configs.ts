@@ -22,6 +22,14 @@ function mapConfig(config: any): WorkflowConfigItem {
   };
 }
 
+async function scopeBelongsToWorkspace(scopeId: string, workspaceId: string) {
+  const scope = await prisma.scope.findFirst({
+    where: { id: scopeId, workspaceId },
+    select: { id: true },
+  });
+  return Boolean(scope);
+}
+
 export async function workflowConfigRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { scopeId?: string } }>('/workflow-configs', async (request) => {
     const configs = await findWorkflowConfigs(
@@ -35,6 +43,10 @@ export async function workflowConfigRoutes(app: FastifyInstance) {
   app.post<{ Body: WorkflowConfigCreateRequest }>(
     '/workflow-configs',
     async (request, reply) => {
+      if (!(await scopeBelongsToWorkspace(request.body.scopeId, request.workspaceId))) {
+        return reply.code(404).send({ error: 'Scope not found' });
+      }
+
       const config = await createWorkflowConfig(prisma, {
         ...request.body,
         workspaceId: request.workspaceId,
@@ -51,6 +63,9 @@ export async function workflowConfigRoutes(app: FastifyInstance) {
       });
       if (!existing || existing.workspaceId !== request.workspaceId) {
         return reply.code(404).send({ error: 'Config not found' });
+      }
+      if (!(await scopeBelongsToWorkspace(request.body.scopeId, request.workspaceId))) {
+        return reply.code(404).send({ error: 'Scope not found' });
       }
 
       const updated = await updateWorkflowConfig(prisma, request.params.id, request.body);

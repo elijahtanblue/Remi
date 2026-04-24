@@ -8,7 +8,7 @@ import {
   renderIssuePanel,
   verifyJiraJwt,
 } from '@remi/jira';
-import { prisma, createWorkspace, findCurrentSummary, findIssueByKey, findLinksByIssueId, findWorkspaceByJiraClientKey } from '@remi/db';
+import { prisma, createWorkspace, findCurrentSummary, findCwrByIssueId, findIssueByKey, findLinksByIssueId, findWorkspaceByJiraClientKey } from '@remi/db';
 import { queue } from '../../queue.js';
 import { QueueNames } from '@remi/shared';
 import { config } from '../../config.js';
@@ -138,15 +138,28 @@ export async function jiraRoutes(app: FastifyInstance) {
     }
 
     const issue = await findIssueByKey(prisma, workspaceId, issueKey).catch(() => null);
-    const summary = issue
-      ? await findCurrentSummary(prisma, issue.id).catch(() => null)
-      : null;
-    const links = issue ? await findLinksByIssueId(prisma, issue.id) : [];
+    const [summary, cwr, links] = await Promise.all([
+      issue ? findCurrentSummary(prisma, issue.id).catch(() => null) : Promise.resolve(null),
+      issue ? findCwrByIssueId(prisma, issue.id).catch(() => null) : Promise.resolve(null),
+      issue ? findLinksByIssueId(prisma, issue.id) : Promise.resolve([]),
+    ]);
 
     const html = renderIssuePanel({
       issueKey,
       summary: (summary?.content as import('@remi/shared').SummaryOutput | null) ?? null,
       linkedThreadCount: links.filter((l) => !l.unlinkedAt).length,
+      cwr: cwr ? {
+        currentState: cwr.currentState,
+        ownerDisplayName: cwr.ownerDisplayName,
+        waitingOnType: cwr.waitingOnType,
+        waitingOnDescription: cwr.waitingOnDescription,
+        nextStep: cwr.nextStep,
+        blockerSummary: cwr.blockerSummary,
+        riskScore: cwr.riskScore,
+        confidence: cwr.confidence,
+        isStale: cwr.isStale,
+        updatedAt: cwr.updatedAt.toISOString(),
+      } : null,
     });
 
     return reply.type('text/html').send(html);

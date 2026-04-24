@@ -22,6 +22,7 @@ export const QueueNames = {
   MEMORY_WRITEBACK_APPLY: "memory-writeback-apply",
   DOC_GENERATE_JOBS: "doc-generate-jobs",
   CWR_GENERATE: "cwr-generate",
+  RISK_DIGEST: "risk-digest",
 } as const;
 
 export type QueueName = (typeof QueueNames)[keyof typeof QueueNames];
