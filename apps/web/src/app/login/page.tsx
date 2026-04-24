@@ -8,13 +8,14 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 interface Props {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: Props) {
   if (await getSessionToken()) redirect('/queue');
 
-  const raw = searchParams.error;
+  const { error } = await searchParams;
+  const raw = error;
   const errorMsg = raw
     ? (ERROR_MESSAGES[raw] ?? decodeURIComponent(raw))
     : null;

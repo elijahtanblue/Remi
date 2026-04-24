@@ -6,7 +6,7 @@ import Timeline from '@/components/timeline';
 import EvidencePanel from '@/components/evidence-panel';
 import type { CWRDetail, WaitingOnType } from '@remi/shared';
 
-interface Props { params: { id: string } }
+interface Props { params: Promise<{ id: string }> }
 
 const WAITING_ON_LABELS: Record<WaitingOnType, string> = {
   internal_person:   'Internal person',
@@ -104,14 +104,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default async function IssueDetailPage({ params }: Props) {
+  const { id } = await params;
   const hdrs = await headers();
   const userId      = hdrs.get('x-user-id')      ?? '';
   const workspaceId = hdrs.get('x-workspace-id') ?? '';
 
   const [issue, { events }, { items: evidence }] = await Promise.all([
-    getIssueDetail(userId, workspaceId, params.id).catch(() => null),
-    getIssueTimeline(userId, workspaceId, params.id),
-    getIssueEvidence(userId, workspaceId, params.id),
+    getIssueDetail(userId, workspaceId, id).catch(() => null),
+    getIssueTimeline(userId, workspaceId, id),
+    getIssueEvidence(userId, workspaceId, id),
   ]);
 
   if (!issue) notFound();

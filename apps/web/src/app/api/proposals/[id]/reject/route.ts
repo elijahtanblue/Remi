@@ -4,8 +4,9 @@ import { rejectProposal } from '@/lib/api-client';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const { id } = await params;
   const userId      = request.headers.get('x-user-id')      ?? '';
   const workspaceId = request.headers.get('x-workspace-id') ?? '';
 
@@ -16,7 +17,7 @@ export async function POST(
   } catch { /* no body is fine */ }
 
   try {
-    const result = await rejectProposal(userId, workspaceId, params.id, reason);
+    const result = await rejectProposal(userId, workspaceId, id, reason);
     return NextResponse.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
