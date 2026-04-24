@@ -157,9 +157,12 @@ jobs:
             # Pull images pinned to this exact commit SHA
             compose -f docker-compose.prod.yml pull
 
-            # Push schema to database (project uses db:push, not migrate)
+            # Apply pending Prisma migrations.
+            # If upgrading an existing database that was previously managed by db push,
+            # run `pnpm --filter @remi/db exec prisma migrate resolve --applied 0_init`
+            # once against that database before this workflow is allowed to deploy.
             compose -f docker-compose.prod.yml run --rm api \
-              pnpm --filter @remi/db db:push --accept-data-loss
+              pnpm --filter @remi/db db:migrate:prod
 
             # Restart all services with new images
             compose -f docker-compose.prod.yml up -d --remove-orphans

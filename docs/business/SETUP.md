@@ -83,9 +83,11 @@ Open the new `.env` file in a text editor and fill in at minimum:
 > **Your computer's terminal**
 
 ```bash
-pnpm db:push    # create tables
+pnpm db:migrate # apply checked-in migrations
 pnpm db:seed    # add demo data
 ```
+
+`pnpm db:migrate` runs Prisma Migrate in development mode. On a fresh local database it applies the committed migration history and creates the tables without using `db push`.
 
 ### 5. Start everything
 
@@ -533,11 +535,20 @@ echo "YOUR_GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password
 docker compose -f docker-compose.prod.yml pull
 
 # Apply database schema
-docker compose -f docker-compose.prod.yml run --rm api pnpm --filter @remi/db db:push --accept-data-loss
+docker compose -f docker-compose.prod.yml run --rm api pnpm --filter @remi/db db:migrate:prod
 
 # Start all 3 services
 docker compose -f docker-compose.prod.yml up -d
 ```
+
+> **If this is an existing Remi deployment that previously used `prisma db push`:** create the baseline migration in source control first, then run this one-time command against the live RDS before the first `db:migrate:prod` deploy:
+>
+> ```bash
+> docker compose -f docker-compose.prod.yml run --rm api \
+>   pnpm --filter @remi/db exec prisma migrate resolve --applied 0_init
+> ```
+>
+> That marks the baseline as already applied on the existing database so future deploys only run new migrations.
 
 > **Note:** After this first setup, GitHub Actions handles all future deploys automatically on every push to `main`.
 

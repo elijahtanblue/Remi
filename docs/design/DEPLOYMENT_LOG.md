@@ -121,15 +121,34 @@ sudo xfs_growfs /
 ### Problem: `The table 'public.workspaces' does not exist`
 Tables had never been created in the production RDS database.
 
-**Root cause:** The project uses `prisma db push` (no migration files exist). The deploy workflow was incorrectly calling `db:migrate:prod` (`prisma migrate deploy`) which found no migration files and did nothing.
+**Original root cause:** The project had no migration history, so `db:migrate:prod` (`prisma migrate deploy`) had nothing to apply.
 
-**Fix — run manually on first deploy:**
+**Original fix — run manually on first deploy:**
 ```bash
 cd ~/remi
 docker-compose -f docker-compose.prod.yml run --rm api pnpm --filter @remi/db db:push --accept-data-loss
 ```
 
-**Fix — deploy workflow** (`.github/workflows/deploy.yml`): changed from `db:migrate:prod` to `db:push --accept-data-loss` so future deploys apply schema changes automatically.
+### Migration hardening follow-up
+
+The project now keeps a Prisma migration history in source control under `packages/db/prisma/migrations/`.
+
+**Baseline step for already-live databases:**
+```bash
+cd ~/remi
+docker compose -f docker-compose.prod.yml run --rm api \
+  pnpm --filter @remi/db exec prisma migrate resolve --applied 0_init
+```
+
+This one-time command records the baseline migration as already applied on the existing RDS database without re-running the SQL.
+
+**Current deploy strategy:** use Prisma Migrate in production:
+```bash
+docker compose -f docker-compose.prod.yml run --rm api \
+  pnpm --filter @remi/db db:migrate:prod
+```
+
+This replaces `db:push --accept-data-loss` so schema changes are versioned, reviewable, and non-destructive by default.
 
 ---
 
