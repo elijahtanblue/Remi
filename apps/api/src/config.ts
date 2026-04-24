@@ -29,6 +29,8 @@ const schema = z.object({
   // Admin
   ADMIN_API_KEY: z.string().default('dev-admin-key'),
   INTERNAL_TOKEN: z.string().default('dev-internal-token'),
+  RISK_SCORE_THRESHOLD: z.coerce.number().default(0.6),
+  RECENT_CHANGE_HOURS: z.coerce.number().default(24),
   // App base URL (for Jira Connect descriptor)
   BASE_URL: z.string().default('http://localhost:3000'),
   // Confluence OAuth
