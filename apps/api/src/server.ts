@@ -5,6 +5,7 @@ import { slackRoutes } from './routes/slack/index.js';
 import { jiraRoutes } from './routes/jira/index.js';
 import { adminRoutes } from './routes/admin/index.js';
 import { internalRoutes } from './routes/internal/index.js';
+import { webRoutes } from './routes/web/index.js';
 import { AppError, ValidationError, NotFoundError } from '@remi/shared';
 
 export async function buildServer() {
@@ -32,6 +33,7 @@ export async function buildServer() {
   await app.register(jiraRoutes, { prefix: '/jira' });
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(internalRoutes, { prefix: '/internal' });
+  await app.register(webRoutes, { prefix: '/web' });
 
   // Global error handler — maps AppError subclasses to HTTP status codes
   app.setErrorHandler((error, request, reply) => {
