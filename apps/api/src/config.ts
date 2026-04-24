@@ -28,6 +28,7 @@ const schema = z.object({
   S3_REGION: z.string().default('ap-southeast-2'),
   // Admin
   ADMIN_API_KEY: z.string().default('dev-admin-key'),
+  INTERNAL_TOKEN: z.string().default('dev-internal-token'),
   // App base URL (for Jira Connect descriptor)
   BASE_URL: z.string().default('http://localhost:3000'),
   // Confluence OAuth
