@@ -1,14 +1,18 @@
-# Autonomous Memory v1
+# Archived: Autonomous Memory v1
+
+> Archived or superseded by [Remi-ticket-reconstruction-assistant-v3.md](../design/Remi-ticket-reconstruction-assistant-v3.md). Research/reference only. Do not use this as current product direction, coding-agent scope, or GTM guidance.
 
 ## Summary
 Build Autonomous Memory as a new AI-backed subsystem that continuously turns opted-in Slack/Jira activity into a living, cited memory record for work in progress. Remi should store raw source events first, derive structured observations and rolling memory snapshots second, and only write externally to Jira after human approval.
 
-V1 should stay aligned with the current product shape:
-- Capture scope: linked Slack threads and Remi app DMs only — all Slack channels are ingested by default; users seeking private discussion should use direct messages
-- Primary audience: engineering / product teams already using Slack + Jira
-- Source of truth: Remi-owned memory records
+Strategy update: this spec should now be read through the ticket-reconstruction pivot. Autonomous Memory is an implementation layer for the **Current Work Record**, not a separate generic memory product.
+
+V1 should stay aligned with the current product direction:
+- Capture scope: linked issue evidence only — Slack threads, Jira activity, and Gmail/email context tied to the issue or scoped pilot workflow
+- Primary audience: support, implementation, customer operations, and escalation-heavy workflows before generic PM productivity
+- Product artifact: issue-scoped Current Work Record, backed by cited Remi memory records
 - External writeback: Jira comment only, approval-gated (see AI_DECISIONS.md for rationale)
-- Docs tools: explicitly out of scope for v1, but the data model should be reusable for future Notion/Confluence/GDocs writeback
+- Docs target: Confluence draft generation is near-term and write-only first; Notion and two-way docs sync remain deferred
 
 ---
 
@@ -83,12 +87,14 @@ V1 user surfaces:
   - read from `MemorySnapshot` instead of only the deterministic summary output for enabled workspaces
   - show freshness, top decisions, actions, blockers, and unresolved questions
 - Slack App Home
-  - list recent memory units, stale units, and pending approvals
+  - current secondary surface for recent memory units, stale units, and pending approvals
 - Jira panel
   - show latest memory snapshot and pending writeback proposal
   - add approve/reject actions for writeback
 - Admin
   - add memory unit detail, snapshot history, proposal review, and rerun controls
+- Remi web workflow
+  - roadmap home for the Current Work Record, issue detail, work queue, approval inbox, and scope settings
 
 V1 writeback behaviour:
 - Remi updates its own memory automatically
@@ -156,9 +162,11 @@ Behavioral compatibility:
 
 ## Assumptions and Defaults
 - V1 is issue-centric and conversation-centric, not a company-wide docs platform
-- All Slack channels are ingested by default when Autonomous Memory is enabled for a workspace; explicit exclusions are the safety mechanism
-- Docs-tool writeback is out of scope but should be a clean future extension
-- Remi-owned memory is the canonical internal record
+- Scope boundaries should use `Scope` / `scopeId` as the future primitive, because the boundary may be a team, workflow, project, department, or pilot rollout
+- Current implementation can continue using workspace and department labels where they already exist, but future `Issue`, `MemoryUnit`, contextual upload, Confluence page, and retrieval/query designs should be scope-aware
+- Docs-tool writeback is not the wedge; Confluence draft generation is a near-term write-only expansion
+- Contextual uploads are pinned reference context, not higher truth over live Slack/Jira/Gmail evidence
+- Remi-owned memory supports the Current Work Record
 - Jira comment is the only external writeback target in v1
 - Hybrid Gemini + OpenAI stack is the default implementation choice (see Section 3)
 - The current deterministic summary system is retained during rollout as a fallback and migration bridge

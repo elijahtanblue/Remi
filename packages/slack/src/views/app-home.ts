@@ -112,13 +112,13 @@ export function registerAppHome(app: App): void {
       const memoryBlocks: unknown[] = memConfig?.enabled
         ? [
             { type: 'divider' },
-            { type: 'section', text: { type: 'mrkdwn', text: '*Autonomous Memory*' } },
+            { type: 'section', text: { type: 'mrkdwn', text: '*Current Work Records*' } },
             ...(memoryUnits.length > 0
               ? memoryUnits.map((u) => ({
                   type: 'section',
                   text: { type: 'mrkdwn', text: `${u.scopeType === 'issue_thread' ? '🧵' : '💬'} ${(u as any).issue?.jiraIssueKey ?? u.scopeRef} · Updated ${new Date(u.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` },
                 }))
-              : [{ type: 'section', text: { type: 'mrkdwn', text: '_No memory units yet. Link a thread to a Jira issue to get started._' } }]),
+              : [{ type: 'section', text: { type: 'mrkdwn', text: '_No Current Work Records yet. Link a thread to a Jira issue to get started._' } }]),
             ...(pendingProposals.length > 0
               ? [{ type: 'section', text: { type: 'mrkdwn', text: `⏳ *${pendingProposals.length} pending Jira writeback ${pendingProposals.length === 1 ? 'proposal' : 'proposals'} awaiting approval*` } }]
               : []),
@@ -135,7 +135,7 @@ export function registerAppHome(app: App): void {
               type: 'header',
               text: {
                 type: 'plain_text',
-                text: 'Remi — Your operational memory',
+                text: 'Remi — Issue coordination',
                 emoji: true,
               },
             },

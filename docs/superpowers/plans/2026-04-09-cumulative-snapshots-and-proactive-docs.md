@@ -10,6 +10,12 @@
 
 ---
 
+## Strategy Note: Scope Boundary
+
+This plan predates the Scope pivot. If implemented or revised now, use `Scope` / `scopeId` as the future isolation primitive for `Issue`, `MemoryUnit`, Confluence page records, and retrieval/query logic. Existing `departmentId` examples can remain current-implementation compatibility details, but new schema work should not deepen the department-only model.
+
+---
+
 ## File Map
 
 | File | Action | Purpose |
@@ -667,7 +673,7 @@ function normalizeContent(s: string): string {
  * the doc renderer can show them as strikethrough.
  *
  * Note: uses substring matching after normalisation. Reworded-but-equivalent
- * items may not be detected. This is a known V1 limitation; see OUT_OF_SCOPE.md
+ * items may not be detected. This is a known V1 limitation; see OUT_OF_SCOPE_COORDINATION_MVP.md
  * (Confidence Level for Observation Resolution).
  */
 export async function reconcileObservationStates(

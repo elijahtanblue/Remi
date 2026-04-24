@@ -113,7 +113,7 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
   return (
     <div style={{ marginBottom: '24px', padding: '16px', border: '1px solid var(--remi-border)', borderRadius: '8px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-        <span style={{ fontWeight: 600, fontSize: '14px' }}>Autonomous Memory</span>
+        <span style={{ fontWeight: 600, fontSize: '14px' }}>Current Work Record</span>
         {config === null ? (
           <span style={{ fontSize: '12px', color: 'var(--remi-muted)' }}>Loading…</span>
         ) : (
@@ -143,7 +143,7 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
           disabled={backfillStatus === 'loading'}
           style={{ marginLeft: '8px' }}
         >
-          {backfillStatus === 'loading' ? 'Running…' : 'Run Memory Backfill'}
+          {backfillStatus === 'loading' ? 'Running…' : 'Run Record Backfill'}
         </button>
         {backfillStatus === 'done' && backfillResult && (
           <span className="badge badge-green" style={{ fontSize: '12px' }}>
@@ -175,7 +175,7 @@ export function MemoryPanel({ workspaceId }: { workspaceId: string }) {
 
       {config?.enabled && (
         <p style={{ fontSize: '12px', color: 'var(--remi-muted)', marginTop: '8px', marginBottom: 0 }}>
-          Memory is active. New Slack messages and Jira events will be processed automatically.
+          Current Work Record processing is active. New Slack messages and Jira events will be processed automatically.
           Use backfill to process existing messages.
         </p>
       )}

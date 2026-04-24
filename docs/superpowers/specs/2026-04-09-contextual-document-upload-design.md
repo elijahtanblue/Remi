@@ -7,9 +7,11 @@
 
 ## Context
 
-Remi assembles operational context from Slack, Jira, and email. A gap exists for authoritative reference material — PRDs, project briefs, stakeholder requirements — that PMs produce outside those systems. Without a way to attach these documents to an issue, the Confluence handoff doc is missing the upstream intent that explains *why* decisions were made.
+Remi assembles operational context from Slack, Jira, and email. A gap exists for pinned reference material — project briefs, customer requirements, vendor docs, implementation notes — that lives outside those systems. Without a way to attach these documents to an issue, the Confluence handoff doc may miss upstream intent that explains *why* decisions were made.
 
-This feature lets a PM upload one document per issue. The file is run through a structured extraction pipeline, stored in S3, and included as a cited section in any Confluence doc generated for that issue.
+This feature lets an authorized workflow owner upload one document per issue. The file is run through a structured extraction pipeline, stored in S3, and included as a cited reference section in any Confluence doc generated for that issue.
+
+Uploaded documents are trusted input, not canonical truth. They enrich retrieval and generation, but do not automatically outrank live Jira, Slack, or Gmail evidence.
 
 ---
 
@@ -85,6 +87,7 @@ model IssueContextDocument {
   id                String   @id @default(cuid())
   issueId           String   @unique
   workspaceId       String
+  scopeId           String?
   filename          String
   fileType          String                  // 'pdf' | 'markdown' | 'text'
   s3KeyOriginal     String
@@ -99,9 +102,12 @@ model IssueContextDocument {
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
+  @@index([scopeId])
   @@map("issue_context_documents")
 }
 ```
+
+`scopeId` is optional in this design because the current implementation may still use workspace/department-style boundaries. Future schema work should make scope the canonical retrieval and isolation primitive across `Issue`, `MemoryUnit`, `IssueContextDocument`, and Confluence page records.
 
 ---
 
@@ -161,7 +167,7 @@ export async function buildIssueDocContext(
 ): Promise<IssueDocContext>
 ```
 
-The function queries `IssueContextDocument` by `issueId`. If found, fetches structured Markdown from `s3KeyExtracted` via the storage adapter and populates `uploadedContext`. Stale detection: compare `uploadedAt` against the maximum `createdAt` across all Slack messages in linked threads. If delta > 30 days → `stale: true`.
+The function queries `IssueContextDocument` by `issueId` inside the current workspace/scope. If found, fetches structured Markdown from `s3KeyExtracted` via the storage adapter and populates `uploadedContext`. Stale detection: compare `uploadedAt` against the maximum `createdAt` across all Slack messages in linked threads. If delta > 30 days → `stale: true`.
 
 The one call site (`apps/worker/src/handlers/doc-generate-jobs.ts`) is updated to pass the storage adapter.
 
@@ -179,7 +185,7 @@ The Confluence page renderer adds a "Project Brief" section when `uploadedContex
 - If doc exists: show filename, upload date, `extractionQuality` badge; offer Replace and Delete
 - `extractionQuality: 'partial'` shows inline warning: "Some tables in this PDF couldn't be fully parsed — consider uploading as Markdown for better results"
 
-**Migration note:** This page is the only component to remove when the product platform replaces admin as the PM surface. The API routes (`/admin/issues/:issueId/context-documents`), `packages/extractor`, and S3 layout are all platform-agnostic and reused unchanged. The routes will move to workspace-member auth at that point.
+**Migration note:** This page is the only component to remove when the product platform replaces admin as the temporary upload surface. The API routes (`/admin/issues/:issueId/context-documents`), `packages/extractor`, and S3 layout are all platform-agnostic and reused unchanged. The routes will move to workspace-member auth at that point.
 
 ---
 
@@ -216,5 +222,6 @@ Gemini is mocked in all tests except `llm-repair.test.ts`.
 - Global workspace document library
 - Scanned / image PDF extraction (requires OCR)
 - Extraction pipeline rollout to email and Jira description sources
-- Product platform / PM-facing UI (admin is temporary)
+- Product platform / end-user upload UI (admin is temporary)
+- Uploaded documents as higher truth over live Jira/Slack/Gmail evidence
 - Re-extraction on demand (possible future feature given original file is stored)

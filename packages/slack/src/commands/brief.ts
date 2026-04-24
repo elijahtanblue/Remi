@@ -37,7 +37,7 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
         return;
       }
 
-      // 3. Check if Autonomous Memory is enabled for this workspace
+      // 3. Check if the Current Work Record pipeline is enabled for this workspace
       const memConfig = await getMemoryConfig(prisma, workspaceId);
       if (memConfig?.enabled) {
         const units = await prisma.memoryUnit.findMany({
@@ -89,7 +89,7 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const blocks: any[] = [
-              { type: 'header', text: { type: 'plain_text', text: `${issueKey} — Memory Brief`, emoji: true } },
+              { type: 'header', text: { type: 'plain_text', text: `${issueKey} — Current Work Record`, emoji: true } },
               { type: 'section', text: { type: 'mrkdwn', text: `*${base.headline}*\n${base.currentState}` } },
               { type: 'context', elements: [{ type: 'mrkdwn', text: `${sourceLabel}Confidence: ${Math.round(base.confidence * 100)}% · Updated ${freshness}` }] },
             ];
@@ -116,12 +116,12 @@ export function registerBriefCommand(app: App, queue: IQueueProducer): void {
               actorId: command.user_id,
               properties: { issueKey, unitCount: units.length, sourceCount: allSnapshots.length },
             }).catch((err) => logger.warn({ err, issueKey }, 'Failed to record product event'));
-            await respond({ response_type: 'in_channel', blocks, text: `Memory brief for *${issueKey}*` });
+            await respond({ response_type: 'in_channel', blocks, text: `Current Work Record for *${issueKey}*` });
             return;
           }
         }
       }
-      // Falls through to deterministic summary path if memory is disabled or no snapshot exists
+      // Falls through to the legacy brief path if no Current Work Record snapshot exists
 
       // 4. If issue data is still placeholder (Jira backfill hasn't completed yet),
       //    trigger a Jira backfill and ask the user to check back.

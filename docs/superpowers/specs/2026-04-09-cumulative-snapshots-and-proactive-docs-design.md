@@ -72,6 +72,8 @@ confluenceVersion Int      @default(1)
 updatedAt         DateTime @updatedAt
 ```
 
+Strategic note: once the Scope foundation lands, Confluence page records should carry `scopeId` for workflow/pilot/project isolation. Current implementation may still mirror `departmentId`, but future retrieval and page lookup logic should treat scope as the canonical boundary.
+
 **Worker change in `apps/worker/src/handlers/doc-generate-jobs.ts`:**
 
 Replace the unconditional `createConfluencePage` + `prisma.confluencePage.create` block with a `createOrUpdatePage` helper that encapsulates the lookup → create/update → upsert DB record logic.
@@ -305,7 +307,7 @@ One migration file. No backfill required — all defaults are safe for existing 
 
 ## Out of Scope
 
-- Confidence level scoring for supersession decisions (see `docs/design/OUT_OF_SCOPE.md`)
+- Confidence level scoring for supersession decisions (see `docs/design/OUT_OF_SCOPE_COORDINATION_MVP.md`)
 - "In review" auto-trigger (deferred — no standard Jira status category)
 - Admin UI for `defaultSpaceKey` configuration
 - Notion output adapter

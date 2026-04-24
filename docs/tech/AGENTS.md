@@ -1,7 +1,9 @@
 # Multi-Agent Workflow
 
-This file is the shared source of truth for all agents (Claude, Codex, Gemini).
+This file is the shared source of truth for agent workflow only (Claude, Codex, Gemini).
 `CLAUDE.md` and `GEMINI.md` both defer to this file.
+
+Product strategy, scope, ICP, roadmap priorities, and positioning defer to [Remi-ticket-reconstruction-assistant-v3.md](../design/Remi-ticket-reconstruction-assistant-v3.md), the singular product source of truth.
 
 ---
 

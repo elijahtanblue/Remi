@@ -46,7 +46,7 @@ export const SlackUrlVerificationSchema = z.object({
 
 export type SlackUrlVerification = z.infer<typeof SlackUrlVerificationSchema>;
 
-// ─── Slack App Home Opened ───
+// ─── Slack Home Tab Opened ───
 
 export const SlackAppHomeOpenedSchema = z.object({
   type: z.literal("app_home_opened"),

@@ -1,4 +1,6 @@
-# Autonomous Memory V1 Implementation Plan
+# Archived: Autonomous Memory V1 Implementation Plan
+
+> Archived or superseded by [Remi-ticket-reconstruction-assistant-v3.md](../design/Remi-ticket-reconstruction-assistant-v3.md). Historical implementation plan only. Do not use this as current product direction, coding-agent scope, or roadmap source.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

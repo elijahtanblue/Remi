@@ -2,11 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Per-issue document upload (PDF/Markdown/TXT) with a three-stage extraction pipeline that produces structured Markdown stored in S3, integrated as an authoritative source in Confluence handoff doc generation.
+**Goal:** Per-issue document upload (PDF/Markdown/TXT) with a three-stage extraction pipeline that produces structured Markdown stored in S3, integrated as pinned reference context in Confluence handoff doc generation.
 
 **Architecture:** Multipart upload to `POST /admin/issues/:issueId/context-documents` runs a new `packages/extractor` pipeline (unpdf bounding-box extraction → Gemini Flash table repair on garbled sections only → S3 storage). `buildIssueDocContext` is extended to fetch and include the extracted content; the page-writer renders it as a "Project Brief" section with a stale warning when the upload predates recent Slack activity.
 
 **Tech Stack:** unpdf (server-side pdfjs-dist), @google/generative-ai (Gemini 2.0 Flash), @fastify/multipart, Prisma, @remi/storage (S3Adapter), vitest
+
+---
+
+## Strategy Note: Upload Trust and Scope
+
+This plan should be read through the ticket-reconstruction pivot. Context documents are pinned reference inputs, not higher truth over live Jira, Slack, or Gmail evidence. The future isolation primitive is `Scope` / `scopeId`; current workspace/department compatibility can remain where needed, but new retrieval and schema work should be scope-aware.
 
 ---
 
@@ -44,7 +50,7 @@
 - `apps/api/src/routes/admin/index.ts` — add 3 context-document routes
 - `apps/worker/src/config.ts` — add `STORAGE_ADAPTER`, `S3_BUCKET`, `S3_REGION`
 - `apps/worker/src/handlers/doc-generate-jobs.ts` — pass storage to `buildIssueDocContext`
-- `docs/design/OUT_OF_SCOPE.md` — append new items
+- `docs/design/OUT_OF_SCOPE_COORDINATION_MVP.md` — append new items
 
 ---
 
@@ -62,6 +68,7 @@ model IssueContextDocument {
   id                String   @id @default(cuid())
   issueId           String   @unique
   workspaceId       String
+  scopeId           String?
   filename          String
   fileType          String
   s3KeyOriginal     String
@@ -76,6 +83,7 @@ model IssueContextDocument {
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
+  @@index([scopeId])
   @@map("issue_context_documents")
 }
 ```
@@ -1620,7 +1628,7 @@ git commit -m "feat: GET and DELETE /admin/issues/:issueId/context-documents rou
 In `packages/confluence/src/types.ts`, update `uploadedContext`:
 
 ```typescript
-  /** Present when a PM has uploaded a project brief or context doc for this issue. */
+  /** Present when an authorized user has uploaded a project brief or context doc for this issue. */
   uploadedContext?: {
     filename: string;
     uploadedAt: Date;
@@ -1938,7 +1946,7 @@ git commit -m "feat: pass storage adapter to buildIssueDocContext in doc-generat
 **Files:**
 - Create: `apps/admin/src/app/issues/[issueId]/context/page.tsx`
 
-> **Removal note:** This page is temporary. When the product platform replaces admin as the PM surface, delete this file. The API routes at `/admin/issues/:issueId/context-documents` and the extraction pipeline are reused unchanged.
+> **Removal note:** This page is temporary. When the product platform replaces admin as the end-user upload surface, delete this file. The API routes at `/admin/issues/:issueId/context-documents` and the extraction pipeline are reused unchanged.
 
 - [ ] **Step 1: Create the upload page**
 
@@ -2106,19 +2114,20 @@ git commit -m "feat: admin upload page for issue context documents (temporary su
 
 ---
 
-## Task 16: OUT_OF_SCOPE.md Update
+## Task 16: OUT_OF_SCOPE_COORDINATION_MVP.md Update
 
 **Files:**
-- Modify: `docs/design/OUT_OF_SCOPE.md`
+- Modify: `docs/design/OUT_OF_SCOPE_COORDINATION_MVP.md`
 
 - [ ] **Step 1: Append new entries**
 
-Open `docs/design/OUT_OF_SCOPE.md` and append:
+Open `docs/design/OUT_OF_SCOPE_COORDINATION_MVP.md` and append:
 
 ```markdown
 13. **Multiple documents per issue** — one doc per issue in V1. Multiple docs require listing UI, ordering, and selective inclusion logic in context assembly.
 14. **Extraction pipeline rollout to email and Jira descriptions** — `RichContentDocument` interface is defined in `packages/extractor/src/types.ts` and ready for adoption, but migrating working email/Jira pipelines is a separate project.
-15. **Product platform / PM-facing UI** — the admin dashboard is a temporary upload surface. A dedicated platform with agent-like views, per-team visibility controls, and workspace-member auth is the long-term replacement. Delete `apps/admin/src/app/issues/` when built.
+15. **Product platform / end-user upload UI** — the admin dashboard is a temporary upload surface. A dedicated platform with Current Work Record views, scope controls, and workspace-member auth is the long-term replacement. Delete `apps/admin/src/app/issues/` when built.
+16. **Uploaded documents as higher truth** — contextual uploads are pinned reference input. They should not automatically override newer live Jira, Slack, or Gmail evidence; conflicts should be surfaced, not silently resolved in favor of the upload.
 ```
 
 - [ ] **Step 2: Run full test suite**
@@ -2132,7 +2141,7 @@ Expected: all tests pass.
 - [ ] **Step 3: Final commit**
 
 ```bash
-git add docs/design/OUT_OF_SCOPE.md
+git add docs/design/OUT_OF_SCOPE_COORDINATION_MVP.md
 git commit -m "docs: update OUT_OF_SCOPE with document upload V2 items"
 ```
 
