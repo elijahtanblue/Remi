@@ -1,4 +1,4 @@
-import type { CurrentWorkRecord, PrismaClient } from '@prisma/client';
+import type { CurrentWorkRecord, Prisma, PrismaClient } from '@prisma/client';
 import type { QueueSection } from '@remi/shared';
 
 const RISK_SCORE_THRESHOLD = 0.6;
@@ -14,7 +14,7 @@ export type CwrUpsertData = {
   blockerDetectedAt?: Date | null;
   waitingOnType?: string | null;
   waitingOnDescription?: string | null;
-  openQuestions: unknown[];
+  openQuestions: Prisma.InputJsonValue;
   nextStep?: string | null;
   riskScore: number;
   urgencyReason?: string | null;

@@ -12,3 +12,8 @@ export * from './gmail.repo.js';
 export * from './product-event.repo.js';
 export * from './memory.repo.js';
 export * from './confluence.repo.js';
+export * from './user-session.repo.js';
+export * from './scope.repo.js';
+export * from './cwr.repo.js';
+export * from './workflow-config.repo.js';
+export * from './meaningful-event.repo.js';
