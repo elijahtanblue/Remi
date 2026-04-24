@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { prisma } from '@remi/db';
 import { MemoryQueueAdapter, SqsQueueAdapter } from '@remi/queue';
 import { QueueNames } from '@remi/shared';
 import { startConsumer } from './consumer.js';
@@ -6,11 +7,13 @@ import { handleJiraEvent } from './handlers/jira-events.js';
 import { handleSlackEvent } from './handlers/slack-events.js';
 import { handleSummaryJob } from './handlers/summary-jobs.js';
 import { handleBackfillJob } from './handlers/backfill-jobs.js';
-import type { JiraEventMessage, SlackEventMessage, SummaryJobMessage, BackfillJobMessage, DocGenerateJobMessage } from '@remi/shared';
+import type { JiraEventMessage, SlackEventMessage, SummaryJobMessage, BackfillJobMessage, DocGenerateJobMessage, CWRGenerateMessage } from '@remi/shared';
 import type { MemoryExtractMessage, MemorySnapshotMessage, MemoryWritebackProposeMessage, MemoryWritebackApplyMessage } from '@remi/shared';
 import { handleMemoryExtract, handleMemorySnapshot, handleMemoryWritebackPropose, handleMemoryWritebackApply } from './handlers/memory-jobs.js';
 import { handleDocGenerateJob } from './handlers/doc-generate-jobs.js';
+import { handleCwrGenerate } from './handlers/cwr-generate.js';
 import { syncAllGmailWorkspaces } from '@remi/gmail';
+import { v4 as uuidv4 } from 'uuid';
 
 const queue =
   config.QUEUE_ADAPTER === 'sqs'
@@ -25,7 +28,8 @@ const queue =
           [QueueNames.MEMORY_SNAPSHOT]: config.SQS_MEMORY_SNAPSHOT_URL ?? '',
           [QueueNames.MEMORY_WRITEBACK_PROPOSE]: config.SQS_MEMORY_WRITEBACK_PROPOSE_URL ?? '',
           [QueueNames.MEMORY_WRITEBACK_APPLY]: config.SQS_MEMORY_WRITEBACK_APPLY_URL ?? '',
-        [QueueNames.DOC_GENERATE_JOBS]: config.SQS_DOC_GENERATE_JOBS_URL ?? '',
+          [QueueNames.DOC_GENERATE_JOBS]: config.SQS_DOC_GENERATE_JOBS_URL ?? '',
+          [QueueNames.CWR_GENERATE]: config.SQS_CWR_GENERATE_URL ?? '',
         },
       })
     : new MemoryQueueAdapter();
@@ -64,6 +68,10 @@ startConsumer(queue, QueueNames.DOC_GENERATE_JOBS, (msg) =>
   handleDocGenerateJob(msg as DocGenerateJobMessage),
 );
 
+startConsumer(queue, QueueNames.CWR_GENERATE, (msg) =>
+  handleCwrGenerate(msg as CWRGenerateMessage),
+);
+
 console.log(`[worker] Started consuming queues: ${Object.values(QueueNames).join(', ')}`);
 
 // ─── Gmail batch sync ─────────────────────────────────────────────────────────
@@ -73,6 +81,7 @@ console.log(`[worker] Started consuming queues: ${Object.values(QueueNames).join
 const GMAIL_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
 let gmailSyncTimer: ReturnType<typeof setInterval> | undefined;
+let cwrStaleSweepTimer: ReturnType<typeof setInterval> | undefined;
 
 if (config.GMAIL_SYNC_ENABLED) {
   syncAllGmailWorkspaces(queue).catch((err: unknown) =>
@@ -85,9 +94,40 @@ if (config.GMAIL_SYNC_ENABLED) {
   }, GMAIL_SYNC_INTERVAL_MS);
 }
 
+async function runCwrStaleSweep(): Promise<void> {
+  const cwrs = await prisma.currentWorkRecord.findMany({
+    select: { issueId: true, workspaceId: true },
+  });
+
+  for (const cwr of cwrs) {
+    await queue.send(QueueNames.CWR_GENERATE, {
+      id: uuidv4(),
+      idempotencyKey: `cwr-stale-sweep:${cwr.issueId}:${Math.floor(Date.now() / 3_600_000)}`,
+      workspaceId: cwr.workspaceId,
+      timestamp: new Date().toISOString(),
+      type: 'cwr_generate',
+      payload: { issueId: cwr.issueId, triggerSource: 'stale_sweep' },
+    });
+  }
+
+  console.log(`[cwr-stale-sweep] Enqueued ${cwrs.length} CWR sweep jobs`);
+}
+
+if (config.CWR_STALE_SWEEP_INTERVAL_MS > 0) {
+  runCwrStaleSweep().catch((err: unknown) =>
+    console.error('[cwr-stale-sweep] Initial sweep error:', err),
+  );
+  cwrStaleSweepTimer = setInterval(() => {
+    runCwrStaleSweep().catch((err: unknown) =>
+      console.error('[cwr-stale-sweep] Sweep error:', err),
+    );
+  }, config.CWR_STALE_SWEEP_INTERVAL_MS);
+}
+
 process.on('SIGTERM', async () => {
   console.log('[worker] SIGTERM received, stopping...');
   if (gmailSyncTimer) clearInterval(gmailSyncTimer);
+  if (cwrStaleSweepTimer) clearInterval(cwrStaleSweepTimer);
   await queue.stop();
   process.exit(0);
 });
