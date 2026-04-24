@@ -525,8 +525,13 @@ cd ~/remi
 # Copy your secrets file into the project
 cp ~/.env.prod .env.prod
 
-# Create the compose variable file (separate from .env.prod — this is for Docker Compose itself)
-echo "GHCR_IMAGE_PREFIX=ghcr.io/YOUR_GITHUB_USERNAME" > .env
+# Create the compose variable file (separate from .env.prod - this is for Docker Compose itself)
+# Use the exact commit SHA that GitHub Actions just built, not the mutable "latest" tag.
+IMAGE_TAG="$(git rev-parse HEAD)"
+cat > .env <<EOF
+GHCR_IMAGE_PREFIX=ghcr.io/YOUR_GITHUB_USERNAME
+IMAGE_TAG=${IMAGE_TAG}
+EOF
 
 # Log in to GHCR with the token from Step 10
 echo "YOUR_GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
@@ -550,7 +555,7 @@ docker compose -f docker-compose.prod.yml up -d
 >
 > That marks the baseline as already applied on the existing database so future deploys only run new migrations.
 
-> **Note:** After this first setup, GitHub Actions handles all future deploys automatically on every push to `main`.
+> **Note:** After this first setup, GitHub Actions handles all future deploys automatically on every push to `main` and rewrites `~/remi/.env` with the exact commit SHA being deployed.
 
 Check that everything is running:
 

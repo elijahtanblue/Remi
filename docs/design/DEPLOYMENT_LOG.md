@@ -123,11 +123,7 @@ Tables had never been created in the production RDS database.
 
 **Original root cause:** The project had no migration history, so `db:migrate:prod` (`prisma migrate deploy`) had nothing to apply.
 
-**Original fix — run manually on first deploy:**
-```bash
-cd ~/remi
-docker-compose -f docker-compose.prod.yml run --rm api pnpm --filter @remi/db db:push --accept-data-loss
-```
+**Current fix:** keep Prisma migrations in source control, baseline already-live databases once, then run `db:migrate:prod` for every deploy.
 
 ### Migration hardening follow-up
 
@@ -148,7 +144,7 @@ docker compose -f docker-compose.prod.yml run --rm api \
   pnpm --filter @remi/db db:migrate:prod
 ```
 
-This replaces `db:push --accept-data-loss` so schema changes are versioned, reviewable, and non-destructive by default.
+This replaces the old destructive `db push` deployment path so schema changes are versioned, reviewable, and non-destructive by default.
 
 ---
 

@@ -2,15 +2,16 @@
 #
 # Compose-level variables (not container env vars):
 #   GHCR_IMAGE_PREFIX — set via shell env or a .env file in this directory
-#   IMAGE_TAG         — defaults to "latest"; deploy workflow pins to ${{ github.sha }}
+#   IMAGE_TAG         — required. Use the commit SHA image tag built by GitHub Actions.
 #
 # On EC2, create ~/remi/.env with:
 #   GHCR_IMAGE_PREFIX=ghcr.io/your-github-username
+#   IMAGE_TAG=<github-commit-sha>
 #
 # In GitHub Actions, the deploy workflow exports both variables inline.
 services:
   api:
-    image: ${GHCR_IMAGE_PREFIX}/remi-api:${IMAGE_TAG:-latest}
+    image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX in ~/remi/.env}/remi-api:${IMAGE_TAG:?Set IMAGE_TAG in ~/remi/.env to a pushed commit SHA}
     ports:
       - "3000:3000"
     env_file: .env.prod
@@ -23,7 +24,7 @@ services:
       start_period: 15s
 
   admin:
-    image: ${GHCR_IMAGE_PREFIX}/remi-admin:${IMAGE_TAG:-latest}
+    image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX in ~/remi/.env}/remi-admin:${IMAGE_TAG:?Set IMAGE_TAG in ~/remi/.env to a pushed commit SHA}
     ports:
       - "3001:3000"
     env_file: .env.prod
@@ -38,6 +39,6 @@ services:
       start_period: 20s
 
   worker:
-    image: ${GHCR_IMAGE_PREFIX}/remi-worker:${IMAGE_TAG:-latest}
+    image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX in ~/remi/.env}/remi-worker:${IMAGE_TAG:?Set IMAGE_TAG in ~/remi/.env to a pushed commit SHA}
     env_file: .env.prod
     restart: unless-stopped

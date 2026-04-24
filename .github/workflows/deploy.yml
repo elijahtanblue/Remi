@@ -29,7 +29,7 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/remi-api:latest,ghcr.io/${{ github.repository_owner }}/remi-api:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/remi-api:${{ github.sha }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
@@ -57,7 +57,7 @@ jobs:
           context: .
           file: apps/worker/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/remi-worker:latest,ghcr.io/${{ github.repository_owner }}/remi-worker:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/remi-worker:${{ github.sha }}
           cache-from: type=gha,scope=worker
           cache-to: type=gha,mode=max,scope=worker
 
@@ -85,7 +85,7 @@ jobs:
           context: .
           file: apps/admin/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/remi-admin:latest,ghcr.io/${{ github.repository_owner }}/remi-admin:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/remi-admin:${{ github.sha }}
           cache-from: type=gha,scope=admin
           cache-to: type=gha,mode=max,scope=admin
 
@@ -150,6 +150,10 @@ jobs:
 
             export GHCR_IMAGE_PREFIX="ghcr.io/${{ github.repository_owner }}"
             export IMAGE_TAG="${{ github.sha }}"
+
+            # Persist the exact image set for manual EC2 compose commands.
+            # This prevents the server from falling back to mutable `latest`.
+            printf 'GHCR_IMAGE_PREFIX=%s\nIMAGE_TAG=%s\n' "$GHCR_IMAGE_PREFIX" "$IMAGE_TAG" > .env
 
             # Remove unused images to free disk space before pulling new ones
             docker image prune -af
