@@ -1,0 +1,76 @@
+/* === Remi Web Design Tokens === */
+:root {
+  --remi-navy:       #273F6E;
+  --remi-navy-deep:  #1E3259;
+  --remi-ink:        #1F2E4F;
+  --remi-canvas:     #FAF7F6;
+  --remi-surface:    #FEFEFE;
+  --remi-muted:      #5F6880;
+  --remi-border:     #D9DFEA;
+  --remi-red:        #C84848;
+  --remi-orange:     #C87028;
+  --remi-green:      #2D7A50;
+  --remi-blue:       #2563EB;
+  --remi-blue-faint: #EFF4FF;
+  --remi-radius:     8px;
+  --remi-shadow:     0 1px 3px rgba(0,0,0,.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: var(--remi-ink);
+  background: var(--remi-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--remi-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Utilities */
+.card {
+  background: var(--remi-surface);
+  border: 1px solid var(--remi-border);
+  border-radius: var(--remi-radius);
+  box-shadow: var(--remi-shadow);
+  padding: 16px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.badge-red    { background: #FEE2E2; color: var(--remi-red); }
+.badge-orange { background: #FEF3C7; color: var(--remi-orange); }
+.badge-green  { background: #D1FAE5; color: var(--remi-green); }
+.badge-blue   { background: var(--remi-blue-faint); color: var(--remi-blue); }
+.badge-muted  { background: #F3F4F6; color: var(--remi-muted); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  text-decoration: none;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary  { background: var(--remi-navy); color: #fff; }
+.btn-primary:hover { background: var(--remi-navy-deep); text-decoration: none; }
+.btn-ghost    { background: transparent; color: var(--remi-muted); border: 1px solid var(--remi-border); }
+.btn-ghost:hover { background: #F3F4F6; text-decoration: none; }
+.btn-danger   { background: transparent; color: var(--remi-red); border: 1px solid #FECACA; }
+.btn-danger:hover { background: #FEE2E2; text-decoration: none; }
+.btn-approve  { background: #D1FAE5; color: var(--remi-green); border: 1px solid #A7F3D0; }
+.btn-approve:hover { background: #A7F3D0; text-decoration: none; }
