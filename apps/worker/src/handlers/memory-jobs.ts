@@ -92,7 +92,7 @@ export async function handleMemoryExtract(message: MemoryExtractMessage, queue: 
 
 export async function handleMemorySnapshot(
   message: MemorySnapshotMessage,
-  _queue: IQueueProducer,
+  queue: IQueueProducer,
 ): Promise<void> {
   const { memoryUnitId } = message.payload;
 
@@ -104,6 +104,17 @@ export async function handleMemorySnapshot(
 
   if (isNew) {
     console.log(`[memory-snapshot] Snapshot v${snapshot.version} created for unit ${memoryUnitId}`);
+  }
+
+  if (unit?.issueId) {
+    await queue.send(QueueNames.CWR_GENERATE, {
+      id: uuidv4(),
+      idempotencyKey: `cwr-generate:${unit.issueId}:snapshot:${snapshot.id}`,
+      workspaceId: message.workspaceId,
+      timestamp: new Date().toISOString(),
+      type: 'cwr_generate',
+      payload: { issueId: unit.issueId, triggerSource: 'stage2_complete' },
+    });
   }
 }
 

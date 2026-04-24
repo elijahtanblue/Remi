@@ -116,6 +116,22 @@ export interface DocGenerateJobMessage extends BaseQueueMessage {
   };
 }
 
+// ─── CWR Generate Job ───
+
+export type CWRTriggerSource =
+  | 'stage2_complete'
+  | 'jira_change'
+  | 'link_change'
+  | 'stale_sweep';
+
+export interface CWRGenerateMessage extends BaseQueueMessage {
+  type: 'cwr_generate';
+  payload: {
+    issueId: string;
+    triggerSource: CWRTriggerSource;
+  };
+}
+
 // ─── Union ───
 
 export type QueueMessage =
@@ -127,4 +143,5 @@ export type QueueMessage =
   | MemorySnapshotMessage
   | MemoryWritebackProposeMessage
   | MemoryWritebackApplyMessage
-  | DocGenerateJobMessage;
+  | DocGenerateJobMessage
+  | CWRGenerateMessage;

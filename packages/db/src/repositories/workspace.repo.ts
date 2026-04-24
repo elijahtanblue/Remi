@@ -20,6 +20,24 @@ export async function findWorkspaceBySlackTeamId(prisma: PrismaClient, slackTeam
   });
 }
 
+export async function findSlackInstallByTeamId(prisma: PrismaClient, slackTeamId: string) {
+  return prisma.slackWorkspaceInstall.findUnique({ where: { slackTeamId } });
+}
+
+export async function findSlackUserBySlackId(
+  prisma: PrismaClient,
+  slackUserId: string,
+  slackTeamId: string,
+) {
+  return prisma.slackUser.findUnique({
+    where: { slackUserId_slackTeamId: { slackUserId, slackTeamId } },
+  });
+}
+
+export async function findUserById(prisma: PrismaClient, id: string) {
+  return prisma.user.findUnique({ where: { id } });
+}
+
 export async function findWorkspaceByJiraClientKey(prisma: PrismaClient, clientKey: string) {
   return prisma.workspace.findFirst({
     where: {

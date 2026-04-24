@@ -250,13 +250,14 @@ async function processMessage(
   // Only send DM for issue+thread pairs that are newly linked (first time seen)
   const confirmedIssueKeys: string[] = [];
   const confirmedIssues: Array<{ id: string; jiraIssueKey: string }> = [];
+  const confirmedIssueLinks: Array<{ issueId: string; linkId: string }> = [];
   for (const issueKey of issueKeys) {
     const issue = await prisma.issue.findFirst({
       where: { workspaceId, jiraIssueKey: issueKey },
     });
     if (!issue) continue;
 
-    const { created } = await createIssueEmailLink(prisma, {
+    const { record, created } = await createIssueEmailLink(prisma, {
       issueId: issue.id,
       threadId: thread.id,
       method: 'auto_detected',
@@ -264,6 +265,7 @@ async function processMessage(
     if (created) {
       confirmedIssueKeys.push(issueKey);
       confirmedIssues.push(issue);
+      confirmedIssueLinks.push({ issueId: issue.id, linkId: record.id });
     }
   }
 
@@ -282,8 +284,19 @@ async function processMessage(
       });
     }
 
-    // Enqueue memory extraction for each newly linked issue if memory is enabled
     if (queue) {
+      for (const link of confirmedIssueLinks) {
+        await queue.send(QueueNames.CWR_GENERATE, {
+          id: uuidv4(),
+          idempotencyKey: `cwr-generate:${link.issueId}:email-link:${link.linkId}`,
+          workspaceId,
+          timestamp: new Date().toISOString(),
+          type: 'cwr_generate',
+          payload: { issueId: link.issueId, triggerSource: 'link_change' },
+        });
+      }
+
+      // Enqueue memory extraction for each newly linked issue if memory is enabled
       const memoryConfig = await getMemoryConfig(prisma, workspaceId);
       if (memoryConfig?.enabled) {
         for (const issue of confirmedIssues) {

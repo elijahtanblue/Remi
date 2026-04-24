@@ -14,6 +14,8 @@ const schema = z.object({
   SQS_MEMORY_WRITEBACK_PROPOSE_URL: z.string().optional(),
   SQS_MEMORY_WRITEBACK_APPLY_URL: z.string().optional(),
   SQS_DOC_GENERATE_JOBS_URL: z.string().optional(),
+  SQS_CWR_GENERATE_URL: z.string().optional(),
+  CWR_STALE_SWEEP_INTERVAL_MS: z.coerce.number().default(3_600_000),
   SLACK_BOT_TOKEN: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),

@@ -33,6 +33,11 @@ model Workspace {
   productEvents ProductEvent[]
   memoryConfig  WorkspaceMemoryConfig?
   memoryUnits   MemoryUnit[]
+  userSessions  UserSession[]
+  scopes        Scope[]
+  workflowConfigs WorkflowScopeConfig[]
+  currentWorkRecords CurrentWorkRecord[]
+  meaningfulEvents   MeaningfulEvent[]
 
   @@map("workspaces")
 }
@@ -106,6 +111,7 @@ model User {
   jiraUsers  JiraUser[]
   crosswalks UserCrosswalk[]
   linkedIssueThreads IssueThreadLink[]
+  sessions   UserSession[]
 
   @@index([workspaceId])
   @@map("users")
@@ -174,17 +180,22 @@ model Issue {
   updatedAt              DateTime @updatedAt
 
   departmentId           String?
+  scopeId                String?
 
   workspace   Workspace         @relation(fields: [workspaceId], references: [id])
   department  Department?       @relation(fields: [departmentId], references: [id])
+  scope       Scope?            @relation(fields: [scopeId], references: [id])
   events      IssueEvent[]
   threadLinks IssueThreadLink[]
   emailLinks  IssueEmailLink[]
   summaries   Summary[]
   memoryUnits MemoryUnit[]
+  currentWorkRecord CurrentWorkRecord?
+  meaningfulEvents  MeaningfulEvent[]
 
   @@unique([jiraIssueId, jiraSiteUrl])
   @@index([workspaceId])
+  @@index([workspaceId, scopeId])
   @@index([jiraIssueKey])
   @@map("issues")
 }
@@ -599,4 +610,135 @@ model MemoryWritebackProposal {
   @@index([memoryUnitId])
   @@index([status])
   @@map("memory_writeback_proposals")
+}
+
+model UserSession {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  lastSeenAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model Scope {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  type        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id])
+  workflowConfigs WorkflowScopeConfig[]
+  issues          Issue[]
+
+  @@index([workspaceId])
+  @@map("scopes")
+}
+
+model WorkflowScopeConfig {
+  id                   String   @id @default(cuid())
+  workspaceId          String
+  scopeId              String
+  workflowKey          String
+  name                 String
+  includedChannelIds   String[]
+  includedJiraProjects String[]
+  includedMailboxes    String[]
+  writebackEnabled     Boolean  @default(false)
+  approvalRequired     Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  scope     Scope     @relation(fields: [scopeId], references: [id])
+
+  @@unique([scopeId, workflowKey])
+  @@index([workspaceId])
+  @@map("workflow_scope_configs")
+}
+
+model CurrentWorkRecord {
+  id                          String   @id @default(cuid())
+  issueId                     String   @unique
+  workspaceId                 String
+
+  currentState                String
+  ownerDisplayName            String?
+  ownerExternalId             String?
+  ownerSource                 String?
+  blockerSummary              String?
+  blockerDetectedAt           DateTime?
+  waitingOnType               String?
+  waitingOnDescription        String?
+  openQuestions               Json
+  nextStep                    String?
+
+  riskScore                   Float    @default(0)
+  urgencyReason               String?
+  isStale                     Boolean  @default(false)
+  staleSince                  DateTime?
+
+  ownerConfirmedAt            DateTime?
+  blockerClearedAt            DateTime?
+
+  lastJiraStatus              String?
+  lastJiraAssigneeId          String?
+
+  sourceMemoryUnitIds         String[]
+  sourceSnapshotIds           String[]
+  snapshotSetHash             String
+
+  dataSources                 String[]
+  sourceFreshnessAt           DateTime
+  lastMeaningfulChangeAt      DateTime?
+  lastMeaningfulChangeSummary String?
+
+  confidence                  Float
+  modelId                     String
+  promptVersion               String
+  generatedAt                 DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  issue     Issue     @relation(fields: [issueId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, isStale])
+  @@index([workspaceId, riskScore])
+  @@index([workspaceId, lastMeaningfulChangeAt])
+  @@index([workspaceId, sourceFreshnessAt])
+  @@map("current_work_records")
+}
+
+model MeaningfulEvent {
+  id             String   @id @default(cuid())
+  issueId        String
+  workspaceId    String
+  idempotencyKey String   @unique
+  eventType      String
+  summary        String
+  source         String
+  sourceRef      String?
+  sourceUrl      String?
+  actorName      String?
+  metadata       Json?
+  occurredAt     DateTime
+  createdAt      DateTime @default(now())
+
+  issue     Issue     @relation(fields: [issueId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([issueId, occurredAt])
+  @@index([workspaceId, occurredAt])
+  @@map("meaningful_events")
 }

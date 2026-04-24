@@ -13,6 +13,8 @@ import { shouldTriggerSummary } from '@remi/summary-engine';
 import { isIssueEventProcessed } from '../dedup.js';
 import { v4 as uuidv4 } from 'uuid';
 
+const CWR_JIRA_EVENT_TYPES = new Set(['status_changed', 'assignee_changed', 'priority_changed']);
+
 export async function handleJiraEvent(
   message: JiraEventMessage,
   queue: IQueueProducer,
@@ -123,6 +125,17 @@ export async function handleJiraEvent(
     rawPayload: payload.rawEvent as Record<string, unknown>,
     occurredAt: new Date(message.timestamp),
   });
+
+  if (CWR_JIRA_EVENT_TYPES.has(derivedEventType)) {
+    await queue.send(QueueNames.CWR_GENERATE, {
+      id: uuidv4(),
+      idempotencyKey: `cwr-generate:${issue.id}:jira:${issueEvent.id}`,
+      workspaceId: workspace.id,
+      timestamp: new Date().toISOString(),
+      type: 'cwr_generate',
+      payload: { issueId: issue.id, triggerSource: 'jira_change' },
+    });
+  }
 
   // 7a. For new issues: store description as a queryable event and generate an
   //     initial summary so the Jira panel is populated without admin intervention.

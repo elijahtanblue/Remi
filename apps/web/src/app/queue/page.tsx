@@ -5,7 +5,7 @@ import QueueCard from '@/components/queue-card';
 import type { QueueSection } from '@remi/shared';
 
 interface Props {
-  searchParams: { section?: string; scopeId?: string };
+  searchParams: Promise<{ section?: string; scopeId?: string }>;
 }
 
 const SECTIONS: { key: QueueSection | 'all'; label: string }[] = [
@@ -16,13 +16,13 @@ const SECTIONS: { key: QueueSection | 'all'; label: string }[] = [
 ];
 
 export default async function QueuePage({ searchParams }: Props) {
+  const { section: requestedSection, scopeId } = await searchParams;
   const hdrs = await headers();
   const userId      = hdrs.get('x-user-id')      ?? '';
   const workspaceId = hdrs.get('x-workspace-id') ?? '';
 
-  const rawSection = searchParams.section ?? 'all';
+  const rawSection = requestedSection ?? 'all';
   const section    = SECTIONS.find((s) => s.key === rawSection)?.key ?? 'all';
-  const scopeId    = searchParams.scopeId;
 
   const { items, total } = await getIssueQueue(userId, workspaceId, { section, scopeId });
 
